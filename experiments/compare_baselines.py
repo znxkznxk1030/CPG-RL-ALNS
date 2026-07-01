@@ -13,6 +13,14 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from crossdock_solver.alns.loop import ALNSConfig, simple_alns
+from crossdock_solver.baselines.cargo_matrix_rl import (
+    CargoMatrixRLConfig,
+    run_cargo_matrix_rl,
+)
+from crossdock_solver.baselines.destination_agent_rl import (
+    DestinationAgentRLConfig,
+    run_destination_agent_rl,
+)
 from crossdock_solver.baselines.paper_sa_rl import PaperSARLConfig, run_paper_sa_rl
 from crossdock_solver.baselines.random_baseline import random_best_of, random_one_solution
 from crossdock_solver.baselines.vaa import run_vaa, vaa_solution
@@ -52,6 +60,8 @@ def run_suite(
     *,
     random_samples: int = 30,
     paper_iterations: int = 300,
+    destination_agent_episodes: int = 150,
+    cargo_matrix_episodes: int = 150,
     alns_iterations: int = 300,
     output_dir: Path = ROOT / "outputs",
 ) -> list[RawObservation]:
@@ -103,6 +113,38 @@ def run_suite(
                 )
             )
 
+            destination_agent_rl = run_destination_agent_rl(
+                instance,
+                DestinationAgentRLConfig(
+                    episodes=destination_agent_episodes,
+                    seed=seed + 27_000,
+                ),
+                initial_solution=vaa.solution,
+            )
+            method_rows.append(
+                (
+                    destination_agent_rl.run.name,
+                    destination_agent_rl.run.result.makespan,
+                    destination_agent_rl.run.runtime_sec,
+                )
+            )
+
+            cargo_matrix_rl = run_cargo_matrix_rl(
+                instance,
+                CargoMatrixRLConfig(
+                    episodes=cargo_matrix_episodes,
+                    seed=seed + 28_000,
+                ),
+                initial_solution=vaa.solution,
+            )
+            method_rows.append(
+                (
+                    cargo_matrix_rl.run.name,
+                    cargo_matrix_rl.run.result.makespan,
+                    cargo_matrix_rl.run.runtime_sec,
+                )
+            )
+
             alns_start = time.perf_counter()
             initial = vaa_solution(instance)
             run = simple_alns(
@@ -146,6 +188,8 @@ def run_suite(
         output_dir / "baseline_summary.md",
         random_samples=random_samples,
         paper_iterations=paper_iterations,
+        destination_agent_episodes=destination_agent_episodes,
+        cargo_matrix_episodes=cargo_matrix_episodes,
         alns_iterations=alns_iterations,
     )
     return observations
@@ -185,6 +229,8 @@ def _write_summary_markdown(
     *,
     random_samples: int,
     paper_iterations: int,
+    destination_agent_episodes: int,
+    cargo_matrix_episodes: int,
     alns_iterations: int,
 ) -> None:
     lines = [
@@ -195,6 +241,10 @@ def _write_summary_markdown(
         "Settings:",
         f"- Random baseline: one-shot and best-of-{random_samples}.",
         f"- Paper model baseline: VAA initialization + Q-learning SA, {paper_iterations} iterations.",
+        "- Destination-agent RL baseline: each destination agent learns a carrier-truck choice, "
+        f"{destination_agent_episodes} training episodes per instance.",
+        "- Cargo-matrix RL baseline: VAA-ordered destination agents observe a "
+        f"9 compound x 3 destination cargo matrix, {cargo_matrix_episodes} training episodes per instance.",
         f"- Proposed MVP: critical-door ALNS with VAA initialization, {alns_iterations} iterations, regret-2 repair.",
         "- Gap is measured against the best method observed on the same generated instance.",
         "",
@@ -231,7 +281,9 @@ def _aggregate(observations: list[RawObservation]) -> list[dict[str, float | int
         "Random-30": 1,
         "VAA": 2,
         "Paper-SA-RL5-300": 3,
-        "CPG-ALNS-300": 4,
+        "DestAgent-RL-150": 4,
+        "CargoMatrix-RL-150": 5,
+        "CPG-ALNS-300": 6,
     }
 
     rows = []

@@ -1,5 +1,15 @@
 from __future__ import annotations
 
+from crossdock_solver.baselines.cargo_matrix_rl import (
+    CargoMatrixRLConfig,
+    cargo_matrix_rl_solution,
+    run_cargo_matrix_rl,
+)
+from crossdock_solver.baselines.destination_agent_rl import (
+    DestinationAgentRLConfig,
+    destination_agent_rl_solution,
+    run_destination_agent_rl,
+)
 from crossdock_solver.baselines.random_baseline import random_best_of, random_one_solution
 from crossdock_solver.baselines.paper_sa_rl import PaperSARLConfig, paper_sa_rl5, paper_sa_rl6, run_paper_sa_rl
 from crossdock_solver.baselines.vaa import (
@@ -70,3 +80,43 @@ def test_paper_sa_rl_aliases_run() -> None:
     check_feasible(instance, rl6.solution)
     assert rl5.name.startswith("Paper-SA-RL5")
     assert rl6.name.startswith("Paper-SA-RL6")
+
+
+def test_destination_agent_rl_baseline_runs() -> None:
+    instance = make_toy_instance()
+    result = run_destination_agent_rl(
+        instance,
+        DestinationAgentRLConfig(episodes=8, batch_size=4, warmup=4, seed=7),
+    )
+
+    check_feasible(instance, result.run.solution)
+    assert result.run.name == "DestAgent-RL-8"
+    assert result.run.result.makespan > 0
+    assert len(result.training_rewards) == 8
+
+
+def test_destination_agent_rl_solution_helper_returns_solution() -> None:
+    instance = make_toy_instance()
+    solution = destination_agent_rl_solution(instance, seed=7, episodes=4)
+
+    check_feasible(instance, solution)
+
+
+def test_cargo_matrix_rl_baseline_runs() -> None:
+    instance = make_toy_instance()
+    result = run_cargo_matrix_rl(
+        instance,
+        CargoMatrixRLConfig(episodes=8, batch_size=4, warmup=4, seed=11),
+    )
+
+    check_feasible(instance, result.run.solution)
+    assert result.run.name == "CargoMatrix-RL-8"
+    assert result.run.result.makespan > 0
+    assert len(result.training_rewards) == 8
+
+
+def test_cargo_matrix_rl_solution_helper_returns_solution() -> None:
+    instance = make_toy_instance()
+    solution = cargo_matrix_rl_solution(instance, seed=11, episodes=4)
+
+    check_feasible(instance, solution)
