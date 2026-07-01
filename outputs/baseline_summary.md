@@ -10,20 +10,20 @@ Settings:
 
 | Instance | Method | N | Avg makespan | Avg gap % | Avg runtime sec | Wins |
 |---|---:|---:|---:|---:|---:|---:|
-| Tiny | Random-1 | 3 | 436.43 | 16.67 | 0.0001 | 0 |
-| Tiny | Random-30 | 3 | 420.32 | 8.13 | 0.0022 | 0 |
-| Tiny | VAA | 3 | 408.82 | 5.10 | 0.0015 | 1 |
-| Tiny | Paper-SA-RL5-300 | 3 | 379.98 | 0.00 | 0.0525 | 3 |
-| Tiny | CPG-ALNS-300 | 3 | 383.49 | 0.77 | 0.4659 | 1 |
-| Small | Random-1 | 3 | 1624.05 | 37.96 | 0.0001 | 0 |
-| Small | Random-30 | 3 | 1370.93 | 14.60 | 0.0033 | 0 |
-| Small | VAA | 3 | 1213.98 | 1.38 | 0.0042 | 0 |
-| Small | Paper-SA-RL5-300 | 3 | 1197.47 | 0.00 | 0.0378 | 3 |
-| Small | CPG-ALNS-300 | 3 | 1213.98 | 1.38 | 0.8848 | 0 |
-| Medium-lite | Random-1 | 3 | 2169.29 | 35.47 | 0.0002 | 0 |
-| Medium-lite | Random-30 | 3 | 1810.84 | 11.69 | 0.0049 | 0 |
-| Medium-lite | VAA | 3 | 1676.07 | 3.84 | 0.0097 | 1 |
-| Medium-lite | Paper-SA-RL5-300 | 3 | 1616.47 | 0.00 | 0.0714 | 3 |
-| Medium-lite | CPG-ALNS-300 | 3 | 1676.07 | 3.84 | 1.4608 | 1 |
+| Tiny | Random-1 | 3 | 436.43 | 17.00 | 0.0003 | 0 |
+| Tiny | Random-30 | 3 | 420.32 | 8.37 | 0.0022 | 0 |
+| Tiny | VAA | 3 | 430.65 | 13.03 | 0.0006 | 0 |
+| Tiny | Paper-SA-RL5-300 | 3 | 379.49 | 0.00 | 0.0418 | 3 |
+| Tiny | CPG-ALNS-300 | 3 | 411.62 | 6.41 | 0.5402 | 0 |
+| Small | Random-1 | 3 | 1624.05 | 38.08 | 0.0002 | 0 |
+| Small | Random-30 | 3 | 1370.93 | 14.75 | 0.0036 | 0 |
+| Small | VAA | 3 | 1275.57 | 6.62 | 0.0015 | 0 |
+| Small | Paper-SA-RL5-300 | 3 | 1195.21 | 0.00 | 0.0571 | 3 |
+| Small | CPG-ALNS-300 | 3 | 1275.57 | 6.62 | 1.5416 | 0 |
+| Medium-lite | Random-1 | 3 | 2169.29 | 33.24 | 0.0003 | 0 |
+| Medium-lite | Random-30 | 3 | 1810.84 | 9.84 | 0.0082 | 0 |
+| Medium-lite | VAA | 3 | 1751.43 | 6.78 | 0.0045 | 0 |
+| Medium-lite | Paper-SA-RL5-300 | 3 | 1643.75 | 0.00 | 0.1246 | 3 |
+| Medium-lite | CPG-ALNS-300 | 3 | 1724.76 | 4.95 | 1.8588 | 0 |
 
 Raw observations are saved in `outputs/baseline_results.csv`.

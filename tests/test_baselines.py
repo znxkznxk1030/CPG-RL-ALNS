@@ -2,7 +2,12 @@ from __future__ import annotations
 
 from crossdock_solver.baselines.random_baseline import random_best_of, random_one_solution
 from crossdock_solver.baselines.paper_sa_rl import PaperSARLConfig, paper_sa_rl5, paper_sa_rl6, run_paper_sa_rl
-from crossdock_solver.baselines.vaa import run_vaa, vaa_solution, vva_solution
+from crossdock_solver.baselines.vaa import (
+    _compound_destination_cost,
+    run_vaa,
+    vaa_solution,
+    vva_solution,
+)
 from crossdock_solver.core.evaluator import evaluate_solution
 from crossdock_solver.core.feasibility import check_feasible
 from tests.conftest import make_toy_instance
@@ -13,6 +18,14 @@ def test_vaa_solution_is_feasible_and_evaluable() -> None:
     solution = vaa_solution(instance)
     check_feasible(instance, solution)
     assert evaluate_solution(instance, solution).makespan > 0
+
+
+def test_vaa_cost_uses_paper_eq_23() -> None:
+    instance = make_toy_instance()
+
+    # If C1 keeps D1, it unloads D2 and D3: 5 + 2.
+    # It also loads D1 demand initially held by C2: 3.
+    assert _compound_destination_cost(instance, "C1", "D1") == 10.0
 
 
 def test_vva_alias_matches_vaa_solution() -> None:

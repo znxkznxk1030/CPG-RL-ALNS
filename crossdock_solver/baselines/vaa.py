@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-import math
 import time
 
 from crossdock_solver.baselines.random_baseline import BaselineRun
@@ -20,38 +19,56 @@ class RegretChoice:
 
 
 def vaa_solution(instance: CrossDockInstance) -> Solution:
-    """Build a deterministic VAA-style constructive baseline.
+    """Build the paper-style VAA constructive heuristic.
 
-    This is a MVP-compatible adaptation of Vogel's Approximation Algorithm. It
-    uses row/column regrets over compound-destination costs to decide which
-    destinations are retained by compound trucks, then greedily assigns doors
-    and outbound sequences.
+    The paper uses VAA only for compound-truck destination assignment
+    with Eq. (23), then completes the heuristic with outbound-destination
+    assignment, central-door assignment, FAT construction, and FT_m based
+    outbound insertion.
     """
 
     compound_to_destination = _assign_compound_destinations_by_regret(instance)
-    compound_assignment = _assign_compound_doors(instance, compound_to_destination)
-
-    assigned_destinations = set(compound_to_destination.values())
-    outbound_destinations = [
-        destination
-        for destination in sorted(instance.destinations, key=lambda d: _destination_load(instance, d), reverse=True)
-        if destination not in assigned_destinations
-    ]
-    outbound_trucks = sorted(
-        instance.outbound_trucks,
-        key=lambda truck: instance.enter_time[truck] + instance.leave_time[truck],
+    outbound_destination_by_truck = _assign_outbound_destinations_by_paper_priority(
+        instance,
+        compound_to_destination,
     )
-    outbound_destination_by_truck = {
-        truck: destination
-        for truck, destination in zip(outbound_trucks, outbound_destinations, strict=True)
+    destination_to_truck = _destination_to_truck(
+        compound_to_destination,
+        outbound_destination_by_truck,
+    )
+    truck_to_destination = {
+        **compound_to_destination,
+        **outbound_destination_by_truck,
     }
-
+    destination_priority = {
+        destination: _destination_completion_priority(
+            instance,
+            destination,
+            destination_to_truck,
+            truck_to_destination,
+        )
+        for destination in instance.destinations
+    }
     solution = Solution(
-        compound_assignment=compound_assignment,
+        compound_assignment={},
         outbound_assignment={},
         door_sequences={door: [] for door in instance.doors},
     )
-    _insert_outbounds_greedily(instance, solution, outbound_destination_by_truck)
+
+    door_finish = _assign_first_trucks_to_doors(
+        instance,
+        solution,
+        compound_to_destination,
+        outbound_destination_by_truck,
+        destination_priority,
+    )
+    _assign_remaining_outbounds_by_ftm(
+        instance,
+        solution,
+        outbound_destination_by_truck,
+        destination_priority,
+        door_finish,
+    )
     check_feasible(instance, solution)
     return solution
 
@@ -147,16 +164,46 @@ def _compound_destination_cost(
     unload_time = total_compound_handling - retained_handling
     compound_loading_time = _destination_load(instance, destination) - retained_handling
 
-    # Lower is better. The first term rewards retaining high own-destination
-    # volume; the second avoids assigning a compound to a destination with heavy
-    # inbound loading from other compounds.
-    return unload_time + 0.5 * compound_loading_time
+    # Paper Eq. (23): partial unloading time of compound i plus loading
+    # time of destination d initially loaded in other compound trucks.
+    return unload_time + compound_loading_time
 
 
-def _assign_compound_doors(
+def _assign_outbound_destinations_by_paper_priority(
     instance: CrossDockInstance,
     compound_to_destination: dict[TruckId, DestinationId],
-) -> dict[TruckId, tuple[DestinationId, DoorId]]:
+) -> dict[TruckId, DestinationId]:
+    """Paper Steps 3-5: assign remaining destinations to outbound trucks."""
+
+    assigned_destinations = set(compound_to_destination.values())
+    unassigned_destinations = {
+        destination for destination in instance.destinations if destination not in assigned_destinations
+    }
+    outbound_destination_by_truck: dict[TruckId, DestinationId] = {}
+
+    for outbound in sorted(
+        instance.outbound_trucks,
+        key=lambda truck: (instance.enter_time[truck] + instance.leave_time[truck], truck),
+    ):
+        destination = max(
+            unassigned_destinations,
+            key=lambda d: (_outbound_destination_priority(instance, d, compound_to_destination), d),
+        )
+        outbound_destination_by_truck[outbound] = destination
+        unassigned_destinations.remove(destination)
+
+    return outbound_destination_by_truck
+
+
+def _assign_first_trucks_to_doors(
+    instance: CrossDockInstance,
+    solution: Solution,
+    compound_to_destination: dict[TruckId, DestinationId],
+    outbound_destination_by_truck: dict[TruckId, DestinationId],
+    destination_priority: dict[DestinationId, float],
+) -> dict[DoorId, float]:
+    """Paper Steps 6-10: construct FAT and assign it to central doors."""
+
     central_doors = sorted(
         instance.doors,
         key=lambda door: (
@@ -164,84 +211,244 @@ def _assign_compound_doors(
             door,
         ),
     )
-    compounds_by_workload = sorted(
+
+    first_trucks = _first_assigned_trucks(
+        instance,
         compound_to_destination,
-        key=lambda compound: _compound_workload(instance, compound, compound_to_destination[compound]),
-        reverse=True,
+        outbound_destination_by_truck,
+        destination_priority,
     )
 
-    assignment: dict[TruckId, tuple[DestinationId, DoorId]] = {}
-    for compound, door in zip(compounds_by_workload, central_doors[: len(compounds_by_workload)], strict=True):
-        assignment[compound] = (compound_to_destination[compound], door)
-    return assignment
+    for truck, door in zip(first_trucks, central_doors):
+        if truck in instance.compound_index:
+            solution.compound_assignment[truck] = (compound_to_destination[truck], door)
+        else:
+            solution.outbound_assignment[truck] = (outbound_destination_by_truck[truck], door)
+            solution.door_sequences[door].append(truck)
+
+    # All compound trucks are included in FAT by construction. The defensive
+    # fallback keeps the solution feasible if an unusual instance has more
+    # compound trucks than FAT slots.
+    used_compound_doors = {door for _, door in solution.compound_assignment.values()}
+    for compound in instance.compound_trucks:
+        if compound in solution.compound_assignment:
+            continue
+        available_doors = [door for door in central_doors if door not in used_compound_doors]
+        door = available_doors[0]
+        solution.compound_assignment[compound] = (compound_to_destination[compound], door)
+        used_compound_doors.add(door)
+
+    return _door_finish_after_first_trucks(instance, solution)
 
 
-def _insert_outbounds_greedily(
+def _assign_remaining_outbounds_by_ftm(
     instance: CrossDockInstance,
     solution: Solution,
-    destination_by_truck: dict[TruckId, DestinationId],
+    outbound_destination_by_truck: dict[TruckId, DestinationId],
+    destination_priority: dict[DestinationId, float],
+    door_finish: dict[DoorId, float],
 ) -> None:
-    ordered_trucks = sorted(
-        destination_by_truck,
+    """Paper Step 11: insert remaining outbound trucks by highest T_d and lowest FT_m."""
+
+    remaining = [
+        truck for truck in instance.outbound_trucks if truck not in solution.outbound_assignment
+    ]
+    remaining.sort(
         key=lambda truck: (
-            _destination_load(instance, destination_by_truck[truck])
-            + instance.enter_time[truck]
-            + instance.leave_time[truck]
+            destination_priority[outbound_destination_by_truck[truck]],
+            outbound_destination_by_truck[truck],
+            truck,
         ),
         reverse=True,
     )
 
-    for truck in ordered_trucks:
-        destination = destination_by_truck[truck]
-        best_solution: Solution | None = None
-        best_makespan = math.inf
-
-        for door in instance.doors:
-            sequence = solution.door_sequences.get(door, [])
-            for position in range(len(sequence) + 1):
-                candidate = solution.copy()
-                candidate.outbound_assignment[truck] = (destination, door)
-                candidate.door_sequences.setdefault(door, [])
-                candidate.door_sequences[door].insert(position, truck)
-
-                completed = _complete_remaining_outbounds(instance, candidate, destination_by_truck)
-                makespan = evaluate_solution(instance, completed).makespan
-                if makespan < best_makespan:
-                    best_makespan = makespan
-                    best_solution = candidate
-
-        if best_solution is None:
-            raise RuntimeError(f"failed to insert outbound truck {truck}")
-        solution.outbound_assignment = best_solution.outbound_assignment
-        solution.door_sequences = best_solution.door_sequences
-
-
-def _complete_remaining_outbounds(
-    instance: CrossDockInstance,
-    partial: Solution,
-    destination_by_truck: dict[TruckId, DestinationId],
-) -> Solution:
-    completed = partial.copy()
-    for truck in sorted(destination_by_truck):
-        if truck in completed.outbound_assignment:
-            continue
-        destination = destination_by_truck[truck]
-        door = min(
-            instance.doors,
-            key=lambda d: (
-                len(completed.door_sequences.get(d, [])),
-                sum(
-                    instance.enter_time[t]
-                    + _destination_load(instance, completed.outbound_assignment[t][0])
-                    + instance.leave_time[t]
-                    for t in completed.door_sequences.get(d, [])
-                ),
-                d,
-            ),
+    for truck in remaining:
+        destination = outbound_destination_by_truck[truck]
+        door = min(instance.doors, key=lambda m: (door_finish[m], m))
+        solution.outbound_assignment[truck] = (destination, door)
+        solution.door_sequences[door].append(truck)
+        door_finish[door] = _outbound_finish_on_door(
+            instance,
+            solution,
+            truck,
+            door,
+            previous_finish=door_finish[door],
         )
-        completed.outbound_assignment[truck] = (destination, door)
-        completed.door_sequences.setdefault(door, []).append(truck)
-    return completed
+
+
+def _first_assigned_trucks(
+    instance: CrossDockInstance,
+    compound_to_destination: dict[TruckId, DestinationId],
+    outbound_destination_by_truck: dict[TruckId, DestinationId],
+    destination_priority: dict[DestinationId, float],
+) -> list[TruckId]:
+    """Paper Step 7: FAT contains all compounds plus longest outbound jobs if needed."""
+
+    first_trucks: list[TruckId] = list(instance.compound_trucks)
+    remaining_slots = max(0, min(len(instance.doors), len(instance.all_trucks)) - len(first_trucks))
+    if remaining_slots > 0:
+        outbound_by_loading = sorted(
+            instance.outbound_trucks,
+            key=lambda truck: (
+                _destination_load(instance, outbound_destination_by_truck[truck]),
+                outbound_destination_by_truck[truck],
+                truck,
+            ),
+            reverse=True,
+        )
+        first_trucks.extend(outbound_by_loading[:remaining_slots])
+
+    destination_by_truck = {
+        **compound_to_destination,
+        **outbound_destination_by_truck,
+    }
+    return sorted(
+        first_trucks,
+        key=lambda truck: (
+            destination_priority[destination_by_truck[truck]],
+            destination_by_truck[truck],
+            truck,
+        ),
+        reverse=True,
+    )
+
+
+def _door_finish_after_first_trucks(
+    instance: CrossDockInstance,
+    solution: Solution,
+) -> dict[DoorId, float]:
+    door_finish = {door: 0.0 for door in instance.doors}
+
+    for compound, (_, door) in solution.compound_assignment.items():
+        door_finish[door] = _compound_finish(instance, solution, compound)
+
+    for outbound, (_, door) in solution.outbound_assignment.items():
+        door_finish[door] = _outbound_finish_on_door(
+            instance,
+            solution,
+            outbound,
+            door,
+            previous_finish=door_finish[door],
+        )
+
+    return door_finish
+
+
+def _destination_to_truck(
+    compound_to_destination: dict[TruckId, DestinationId],
+    outbound_destination_by_truck: dict[TruckId, DestinationId],
+) -> dict[DestinationId, TruckId]:
+    carriers: dict[DestinationId, TruckId] = {}
+    for truck, destination in compound_to_destination.items():
+        carriers[destination] = truck
+    for truck, destination in outbound_destination_by_truck.items():
+        carriers[destination] = truck
+    return carriers
+
+
+def _destination_completion_priority(
+    instance: CrossDockInstance,
+    destination: DestinationId,
+    destination_to_truck: dict[DestinationId, TruckId],
+    truck_to_destination: dict[TruckId, DestinationId],
+) -> float:
+    carrier = destination_to_truck[destination]
+    if carrier in instance.compound_index:
+        ready = max(
+            [_compound_unload_time(instance, carrier, truck_to_destination[carrier])]
+            + [
+                _compound_unload_time(instance, source, truck_to_destination[source])
+                for source in instance.compound_trucks
+                if source != carrier and instance.unit_amount(source, destination) > 0
+            ],
+            default=0.0,
+        )
+        load = sum(
+            instance.handling_time(source, destination)
+            for source in instance.compound_trucks
+            if source != carrier
+        )
+        return ready + load
+
+    compound_to_destination = {
+        truck: truck_to_destination[truck]
+        for truck in instance.compound_trucks
+    }
+    return _outbound_destination_priority(instance, destination, compound_to_destination)
+
+
+def _outbound_destination_priority(
+    instance: CrossDockInstance,
+    destination: DestinationId,
+    compound_to_destination: dict[TruckId, DestinationId],
+) -> float:
+    ready = max(
+        (
+            _compound_unload_time(instance, source, compound_to_destination[source])
+            for source in instance.compound_trucks
+            if instance.unit_amount(source, destination) > 0
+        ),
+        default=0.0,
+    )
+    return ready + _destination_load(instance, destination)
+
+
+def _compound_finish(
+    instance: CrossDockInstance,
+    solution: Solution,
+    compound: TruckId,
+) -> float:
+    destination, target_door = solution.compound_assignment[compound]
+    own_unload_finish = (
+        instance.enter_time[compound]
+        + _compound_unload_time(instance, compound, destination)
+    )
+    destination_ready = _destination_ready_at_door(instance, solution, destination, target_door, carrier=compound)
+    load_time = sum(
+        instance.handling_time(source, destination)
+        for source in instance.compound_trucks
+        if source != compound
+    )
+    return max(own_unload_finish, destination_ready) + load_time + instance.leave_time[compound]
+
+
+def _outbound_finish_on_door(
+    instance: CrossDockInstance,
+    solution: Solution,
+    outbound: TruckId,
+    door: DoorId,
+    *,
+    previous_finish: float,
+) -> float:
+    destination = solution.outbound_assignment[outbound][0]
+    destination_ready = _destination_ready_at_door(instance, solution, destination, door, carrier=outbound)
+    load_time = _destination_load(instance, destination)
+    start = max(previous_finish, destination_ready)
+    return start + instance.enter_time[outbound] + load_time + instance.leave_time[outbound]
+
+
+def _destination_ready_at_door(
+    instance: CrossDockInstance,
+    solution: Solution,
+    destination: DestinationId,
+    target_door: DoorId,
+    *,
+    carrier: TruckId,
+) -> float:
+    ready = 0.0
+    for source in instance.compound_trucks:
+        if source == carrier:
+            continue
+        if instance.unit_amount(source, destination) <= 0:
+            continue
+        source_door = solution.compound_assignment[source][1]
+        retained_destination = solution.compound_assignment[source][0]
+        source_unload_finish = (
+            instance.enter_time[source]
+            + _compound_unload_time(instance, source, retained_destination)
+        )
+        ready = max(ready, source_unload_finish + instance.travel(source_door, target_door))
+    return ready
 
 
 def _destination_load(instance: CrossDockInstance, destination: DestinationId) -> float:
@@ -251,19 +458,13 @@ def _destination_load(instance: CrossDockInstance, destination: DestinationId) -
     )
 
 
-def _compound_workload(
+def _compound_unload_time(
     instance: CrossDockInstance,
     compound: TruckId,
     retained_destination: DestinationId,
 ) -> float:
-    unload_time = sum(
+    return sum(
         instance.handling_time(compound, destination)
         for destination in instance.destinations
         if destination != retained_destination
     )
-    load_time = sum(
-        instance.handling_time(source, retained_destination)
-        for source in instance.compound_trucks
-        if source != compound
-    )
-    return unload_time + load_time + instance.enter_time[compound] + instance.leave_time[compound]
