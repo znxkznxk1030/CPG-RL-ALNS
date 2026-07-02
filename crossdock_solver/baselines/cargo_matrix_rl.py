@@ -37,6 +37,7 @@ class CargoMatrixRLConfig:
     epsilon_decay: float = 0.97
     seed: int | None = None
     name: str = "CargoMatrix-RL"
+    window_strategy: str = "vaa"
 
 
 @dataclass
@@ -73,7 +74,11 @@ def run_cargo_matrix_rl(
 
     reference_solution = initial_solution.copy() if initial_solution is not None else vaa_solution(instance)
     reference_result = evaluate_solution(instance, reference_solution)
-    destination_order = _vaa_destination_order(instance, reference_solution)
+    destination_order = _destination_order_for_strategy(
+        instance,
+        reference_solution,
+        strategy=config.window_strategy,
+    )
 
     best = reference_solution.copy()
     best_result = reference_result
@@ -140,6 +145,46 @@ def cargo_matrix_rl_solution(
     episodes: int = 150,
 ) -> Solution:
     return run_cargo_matrix_rl(
+        instance,
+        CargoMatrixRLConfig(episodes=episodes, seed=seed),
+    ).run.solution
+
+
+def run_topload_cargo_matrix_rl(
+    instance: CrossDockInstance,
+    config: CargoMatrixRLConfig | None = None,
+    *,
+    initial_solution: Solution | None = None,
+) -> CargoMatrixRLResult:
+    config = config or CargoMatrixRLConfig()
+    top_load_config = CargoMatrixRLConfig(
+        episodes=config.episodes,
+        hidden=config.hidden,
+        lr=config.lr,
+        batch_size=config.batch_size,
+        buffer_capacity=config.buffer_capacity,
+        warmup=config.warmup,
+        epsilon_start=config.epsilon_start,
+        epsilon_end=config.epsilon_end,
+        epsilon_decay=config.epsilon_decay,
+        seed=config.seed,
+        name="TopLoad-CargoMatrix-RL",
+        window_strategy="top_load",
+    )
+    return run_cargo_matrix_rl(
+        instance,
+        top_load_config,
+        initial_solution=initial_solution,
+    )
+
+
+def topload_cargo_matrix_rl_solution(
+    instance: CrossDockInstance,
+    *,
+    seed: int | None = None,
+    episodes: int = 150,
+) -> Solution:
+    return run_topload_cargo_matrix_rl(
         instance,
         CargoMatrixRLConfig(episodes=episodes, seed=seed),
     ).run.solution
@@ -280,6 +325,19 @@ def _cargo_matrix_observation(
     return obs
 
 
+def _destination_order_for_strategy(
+    instance: CrossDockInstance,
+    solution: Solution,
+    *,
+    strategy: str,
+) -> list[DestinationId]:
+    if strategy == "vaa":
+        return _vaa_destination_order(instance, solution)
+    if strategy == "top_load":
+        return _top_load_destination_order(instance, solution)
+    raise ValueError(f"unknown cargo matrix window_strategy {strategy!r}")
+
+
 def _vaa_destination_order(
     instance: CrossDockInstance,
     solution: Solution,
@@ -297,3 +355,17 @@ def _vaa_destination_order(
             order.append(destination)
     return order
 
+
+def _top_load_destination_order(
+    instance: CrossDockInstance,
+    solution: Solution,
+) -> list[DestinationId]:
+    vaa_order = _vaa_destination_order(instance, solution)
+    vaa_rank = {destination: idx for idx, destination in enumerate(vaa_order)}
+    return sorted(
+        instance.destinations,
+        key=lambda destination: (
+            -_destination_load(instance, destination),
+            vaa_rank[destination],
+        ),
+    )

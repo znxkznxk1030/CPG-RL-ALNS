@@ -157,3 +157,44 @@ The paper-style VAA is now intentionally more faithful to the paper's constructi
 The paper-style `Paper-SA-RL5-300` is still strongest on Tiny and Small. `CargoMatrix-RL-150` improves over `DestAgent-RL-150` on Small, which supports the idea that exposing compound-truck cargo contents helps. It is weaker on Medium-lite, where `DestAgent-RL-150` still has the best average makespan and 2 of 3 wins. This suggests that the cargo matrix is useful but not sufficient by itself; the model still needs stronger credit assignment and door-aware actions to be reliable.
 
 The proposed MVP `CPG-ALNS-300` is still weaker than both RL baselines in this smoke benchmark. The next useful improvements are high-transfer destroy, sequence-bottleneck destroy, local-search polish, exact repair, and contextual RL operator selection.
+
+## Scaled Door Experiment
+
+Run:
+
+```bash
+python experiments/compare_scaled_doors.py
+```
+
+The script writes:
+
+- `outputs/scaled_door_results.csv`
+- `outputs/scaled_door_summary.md`
+
+Scaled settings:
+
+| Instance | Compound trucks | Outbound trucks | Destinations | Dock doors | Product types | Seeds |
+|---|---:|---:|---:|---:|---:|---|
+| `Medium` | 6 | 9 | 15 | 8 | 4 | 401, 402 |
+| `Big` | 8 | 12 | 20 | 10 | 4 | 501, 502 |
+
+Latest scaled-door results:
+
+| Instance | Method | N | Avg makespan | Avg gap % | Avg runtime sec | Wins |
+|---|---:|---:|---:|---:|---:|---:|
+| Medium | Random-1 | 2 | 3906.32 | 60.78 | 0.0004 | 0 |
+| Medium | Random-30 | 2 | 2946.62 | 20.16 | 0.0119 | 0 |
+| Medium | VAA | 2 | 2532.86 | 3.70 | 0.0175 | 0 |
+| Medium | Paper-SA-RL5-300 | 2 | 2475.16 | 1.21 | 0.2117 | 0 |
+| Medium | DestAgent-RL-150 | 2 | 2467.44 | 0.87 | 1.5559 | 0 |
+| Medium | CargoMatrix-RL-150 | 2 | 2455.24 | 0.37 | 1.5993 | 1 |
+| Medium | CPG-ALNS-300 | 2 | 2447.61 | 0.11 | 13.9023 | 1 |
+| Big | Random-1 | 2 | 5263.53 | 31.17 | 0.0006 | 0 |
+| Big | Random-30 | 2 | 4919.70 | 22.49 | 0.0170 | 0 |
+| Big | VAA | 2 | 4144.19 | 3.19 | 0.0349 | 0 |
+| Big | Paper-SA-RL5-300 | 2 | 4102.77 | 2.14 | 0.2182 | 0 |
+| Big | DestAgent-RL-150 | 2 | 4061.38 | 1.11 | 3.8351 | 0 |
+| Big | CargoMatrix-RL-150 | 2 | 4050.11 | 0.84 | 3.9023 | 1 |
+| Big | CPG-ALNS-300 | 2 | 4053.05 | 0.89 | 56.9259 | 1 |
+
+In the scaled-door setting, `CargoMatrix-RL-150` beats `Paper-SA-RL5-300` on both Medium and Big averages. `CPG-ALNS-300` is competitive in solution quality but becomes much slower on Big because its repair loop repeatedly evaluates larger schedules.
