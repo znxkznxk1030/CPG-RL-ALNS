@@ -22,6 +22,10 @@ from crossdock_solver.baselines.destination_agent_rl import (
     DestinationAgentRLConfig,
     run_destination_agent_rl,
 )
+from crossdock_solver.baselines.graph_cargo_rl import (
+    GraphCargoRLConfig,
+    run_graph_cargo_rl,
+)
 from crossdock_solver.baselines.paper_sa_rl import PaperSARLConfig, run_paper_sa_rl
 from crossdock_solver.baselines.random_baseline import random_best_of, random_one_solution
 from crossdock_solver.baselines.vaa import run_vaa
@@ -187,6 +191,22 @@ def run_suite(
                 )
             )
 
+            graph_cargo_rl = run_graph_cargo_rl(
+                instance,
+                GraphCargoRLConfig(
+                    episodes=cargo_matrix_episodes,
+                    seed=seed + 29_500,
+                ),
+                initial_solution=vaa.solution,
+            )
+            method_rows.append(
+                (
+                    graph_cargo_rl.run.name,
+                    graph_cargo_rl.run.result.makespan,
+                    graph_cargo_rl.run.runtime_sec,
+                )
+            )
+
             alns_start = time.perf_counter()
             initial = vaa.solution
             run = simple_alns(
@@ -325,6 +345,8 @@ def _write_summary_markdown(
         f"9 compound x 3 destination cargo matrix, {cargo_matrix_episodes} training episodes per instance.",
         "- TopLoad-CargoMatrix-RL baseline: the active 3-destination cargo window is sorted by "
         "remaining destination load with VAA as tie-breaker.",
+        "- GraphCargoMatrix-RL baseline: variable-size truck/destination/door graph state "
+        "with cargo and door-travel edges pooled into the shared policy network.",
         "- TopLoad-CargoMatrix-RL + CPG-ALNS: top-load cargo RL initial solution followed by "
         f"critical-door ALNS, {alns_iterations} iterations, regret-2 repair.",
         f"- Proposed MVP: critical-door ALNS with VAA initialization, {alns_iterations} iterations, regret-2 repair.",
@@ -377,8 +399,9 @@ def _aggregate(
         "DestAgent-RL-150": 6,
         "CargoMatrix-RL-150": 7,
         "TopLoad-CargoMatrix-RL-150": 8,
-        "CPG-ALNS-300": 9,
-        "TopLoad-CargoMatrix-RL-150+CPG-ALNS-300": 10,
+        "GraphCargoMatrix-RL-150": 9,
+        "CPG-ALNS-300": 10,
+        "TopLoad-CargoMatrix-RL-150+CPG-ALNS-300": 11,
     }
 
     rows = []

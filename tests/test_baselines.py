@@ -13,6 +13,14 @@ from crossdock_solver.baselines.destination_agent_rl import (
     destination_agent_rl_solution,
     run_destination_agent_rl,
 )
+from crossdock_solver.baselines.graph_cargo_rl import (
+    GRAPH_OBS_SIZE,
+    GraphCargoRLConfig,
+    _build_graph_state,
+    _encode_graph_state,
+    graph_cargo_rl_solution,
+    run_graph_cargo_rl,
+)
 from crossdock_solver.baselines.random_baseline import random_best_of, random_one_solution
 from crossdock_solver.baselines.paper_sa_rl import PaperSARLConfig, paper_sa_rl5, paper_sa_rl6, run_paper_sa_rl
 from crossdock_solver.baselines.vaa import (
@@ -24,6 +32,7 @@ from crossdock_solver.baselines.vaa import (
 )
 from crossdock_solver.core.evaluator import evaluate_solution
 from crossdock_solver.core.feasibility import check_feasible
+from crossdock_solver.data.generator import generate_random_instance
 from tests.conftest import make_toy_instance
 
 
@@ -152,5 +161,57 @@ def test_topload_cargo_matrix_rl_baseline_runs() -> None:
 def test_topload_cargo_matrix_rl_solution_helper_returns_solution() -> None:
     instance = make_toy_instance()
     solution = topload_cargo_matrix_rl_solution(instance, seed=11, episodes=4)
+
+    check_feasible(instance, solution)
+
+
+def test_graph_cargo_state_is_variable_size_with_fixed_encoding() -> None:
+    small = make_toy_instance()
+    medium = generate_random_instance(
+        num_compounds=4,
+        num_outbounds=6,
+        num_doors=5,
+        num_products=3,
+        seed=301,
+    )
+
+    small_state = _build_graph_state(
+        small,
+        current_destination=small.destinations[0],
+        remaining_destinations=list(small.destinations),
+        available_trucks=set(small.all_trucks),
+        assigned_count=0,
+    )
+    medium_state = _build_graph_state(
+        medium,
+        current_destination=medium.destinations[0],
+        remaining_destinations=list(medium.destinations),
+        available_trucks=set(medium.all_trucks),
+        assigned_count=0,
+    )
+
+    assert small_state.truck_nodes.shape[0] != medium_state.truck_nodes.shape[0]
+    assert small_state.destination_nodes.shape[0] != medium_state.destination_nodes.shape[0]
+    assert small_state.door_nodes.shape[0] != medium_state.door_nodes.shape[0]
+    assert _encode_graph_state(small_state).shape == (GRAPH_OBS_SIZE,)
+    assert _encode_graph_state(medium_state).shape == (GRAPH_OBS_SIZE,)
+
+
+def test_graph_cargo_rl_baseline_runs() -> None:
+    instance = make_toy_instance()
+    result = run_graph_cargo_rl(
+        instance,
+        GraphCargoRLConfig(episodes=8, batch_size=4, warmup=4, seed=13),
+    )
+
+    check_feasible(instance, result.run.solution)
+    assert result.run.name == "GraphCargoMatrix-RL-8"
+    assert result.run.result.makespan > 0
+    assert len(result.training_rewards) == 8
+
+
+def test_graph_cargo_rl_solution_helper_returns_solution() -> None:
+    instance = make_toy_instance()
+    solution = graph_cargo_rl_solution(instance, seed=13, episodes=4)
 
     check_feasible(instance, solution)
