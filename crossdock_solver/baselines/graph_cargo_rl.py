@@ -11,17 +11,17 @@ from crossdock_solver.baselines.random_baseline import BaselineRun
 from crossdock_solver.baselines.vaa import _destination_load, vaa_solution
 from crossdock_solver.core.evaluator import evaluate_solution
 from crossdock_solver.core.solution import Solution
-from crossdock_solver.data.instance import CrossDockInstance, DestinationId, TruckId
+from crossdock_solver.data.instance import CrossDockInstance, DestinationId, DoorId, TruckId
 from crossdock_solver.rl.networks import NumpyMLP
 from crossdock_solver.rl.replay_buffer import ReplayBuffer
 
 
 TRUCK_FEATURES = 8
 DESTINATION_FEATURES = 6
-DOOR_FEATURES = 3
+DOOR_FEATURES = 8
 CARGO_EDGE_FEATURES = 5
 TRAVEL_EDGE_FEATURES = 3
-GLOBAL_FEATURES = 8
+GLOBAL_FEATURES = 13
 POOL_STATS = 4
 GRAPH_OBS_SIZE = (
     POOL_STATS
@@ -61,6 +61,15 @@ class GraphState:
     cargo_edges: np.ndarray
     travel_edges: np.ndarray
     global_features: np.ndarray
+
+
+@dataclass(frozen=True)
+class DoorProfile:
+    finish: dict[DoorId, float]
+    load: dict[DoorId, float]
+    utilization: dict[DoorId, float]
+    assigned_count: dict[DoorId, int]
+    critical_door: DoorId
 
 
 @dataclass
@@ -113,6 +122,7 @@ def run_graph_cargo_rl(
         carrier_by_destination, transitions = _rollout_graph_agents(
             instance,
             destination_order,
+            reference_solution,
             net,
             rng,
             epsilon=epsilon,
@@ -166,6 +176,7 @@ def graph_cargo_rl_solution(
 def _rollout_graph_agents(
     instance: CrossDockInstance,
     destination_order: list[DestinationId],
+    reference_solution: Solution,
     net: NumpyMLP,
     rng: random.Random,
     *,
@@ -183,6 +194,8 @@ def _rollout_graph_agents(
             remaining_destinations=remaining_destinations,
             available_trucks=available_trucks,
             assigned_count=len(carrier_by_destination),
+            reference_solution=reference_solution,
+            carrier_by_destination=carrier_by_destination,
         )
         obs = _encode_graph_state(graph_state)
         valid_actions = [
@@ -222,6 +235,8 @@ def _build_graph_state(
     remaining_destinations: list[DestinationId],
     available_trucks: set[TruckId],
     assigned_count: int,
+    reference_solution: Solution | None = None,
+    carrier_by_destination: dict[DestinationId, TruckId] | None = None,
 ) -> GraphState:
     max_tee = max(
         instance.enter_time[truck] + instance.leave_time[truck]
@@ -258,6 +273,17 @@ def _build_graph_state(
         for source in instance.doors
         for target in instance.doors
     ) + 1e-9
+    reference_solution = reference_solution or vaa_solution(instance)
+    carrier_by_destination = carrier_by_destination or {}
+    door_profile = _estimate_door_profile(
+        instance,
+        reference_solution=reference_solution,
+        carrier_by_destination=carrier_by_destination,
+    )
+    max_door_finish = max(door_profile.finish.values(), default=0.0)
+    max_door_load = max(door_profile.load.values(), default=0.0)
+    door_time_scale = max(max_door_finish, max_door_load, max_tee, 1e-9)
+    max_assigned_count = max(1, len(instance.all_trucks))
 
     remaining_set = set(remaining_destinations)
 
@@ -300,6 +326,11 @@ def _build_graph_state(
                 instance.door_index[door] / max(1, len(instance.doors) - 1),
                 centrality[door] / worst_centrality,
                 1.0 - centrality[door] / worst_centrality,
+                door_profile.finish[door] / door_time_scale,
+                door_profile.load[door] / door_time_scale,
+                door_profile.utilization[door],
+                door_profile.assigned_count[door] / max_assigned_count,
+                1.0 if door == door_profile.critical_door else 0.0,
             ]
             for door in instance.doors
         ],
@@ -345,6 +376,8 @@ def _build_graph_state(
         ),
         default=0.0,
     )
+    finish_values = np.array(list(door_profile.finish.values()), dtype=np.float32)
+    load_values = np.array(list(door_profile.load.values()), dtype=np.float32)
     global_features = np.array(
         [
             len(instance.compound_trucks) / max(1, len(instance.all_trucks)),
@@ -357,6 +390,11 @@ def _build_graph_state(
             sum(1 for truck in instance.outbound_trucks if truck in available_trucks)
             / max(1, len(instance.outbound_trucks)),
             1.0 - min_outbound_tee / max_tee,
+            float(np.max(finish_values)) / door_time_scale,
+            float(np.mean(finish_values)) / door_time_scale,
+            float(np.std(finish_values)) / door_time_scale,
+            float(np.max(load_values)) / door_time_scale,
+            float(np.max(load_values) - np.min(load_values)) / door_time_scale,
         ],
         dtype=np.float32,
     )
@@ -463,6 +501,75 @@ def _encode_graph_state(graph_state: GraphState) -> np.ndarray:
     if obs.shape != (GRAPH_OBS_SIZE,):
         raise AssertionError(f"GraphCargoMatrix-RL obs size mismatch: {obs.shape}, expected {GRAPH_OBS_SIZE}")
     return obs
+
+
+def _estimate_door_profile(
+    instance: CrossDockInstance,
+    *,
+    reference_solution: Solution,
+    carrier_by_destination: dict[DestinationId, TruckId],
+) -> DoorProfile:
+    projected_carriers = _project_carrier_assignment(
+        instance,
+        reference_solution=reference_solution,
+        carrier_by_destination=carrier_by_destination,
+    )
+    projected_solution = _build_solution_from_destination_carriers(
+        instance,
+        projected_carriers,
+    )
+    result = evaluate_solution(instance, projected_solution)
+    assigned_count = {
+        door: sum(
+            1
+            for truck in instance.all_trucks
+            if projected_solution.truck_door(truck) == door
+            and projected_solution.truck_destination(truck) in carrier_by_destination
+        )
+        for door in instance.doors
+    }
+    return DoorProfile(
+        finish=result.door_finish,
+        load=result.door_load,
+        utilization=result.door_utilization,
+        assigned_count=assigned_count,
+        critical_door=result.critical_door,
+    )
+
+
+def _project_carrier_assignment(
+    instance: CrossDockInstance,
+    *,
+    reference_solution: Solution,
+    carrier_by_destination: dict[DestinationId, TruckId],
+) -> dict[DestinationId, TruckId]:
+    reference_carriers = reference_solution.destination_carriers()
+    projected: dict[DestinationId, TruckId] = dict(carrier_by_destination)
+    used_trucks = set(projected.values())
+
+    for destination in instance.destinations:
+        if destination in projected:
+            continue
+        reference_truck = reference_carriers[destination]
+        if reference_truck in used_trucks:
+            continue
+        projected[destination] = reference_truck
+        used_trucks.add(reference_truck)
+
+    remaining_destinations = [
+        destination
+        for destination in instance.destinations
+        if destination not in projected
+    ]
+    remaining_trucks = [
+        truck
+        for truck in instance.all_trucks
+        if truck not in used_trucks
+    ]
+    for destination, truck in zip(remaining_destinations, remaining_trucks, strict=True):
+        projected[destination] = truck
+
+    return projected
 
 
 def _pool(values: np.ndarray, feature_count: int) -> list[float]:

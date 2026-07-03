@@ -8,29 +8,32 @@ Settings:
 - Destination-agent RL baseline: each destination agent learns a carrier-truck choice, 150 training episodes per instance.
 - Cargo-matrix RL baseline: VAA-ordered destination agents observe a 9 compound x 3 destination cargo matrix, 150 training episodes per instance.
 - TopLoad-CargoMatrix-RL baseline: the active 3-destination cargo window is sorted by remaining destination load with VAA as tie-breaker.
+- GraphCargoMatrix-RL baseline: variable-size truck/destination/door graph state with cargo and door-travel edges pooled into the shared policy network.
 - TopLoad-CargoMatrix-RL + CPG-ALNS: top-load cargo RL initial solution followed by critical-door ALNS, 300 iterations, regret-2 repair.
 - Proposed MVP: critical-door ALNS with VAA initialization, 300 iterations, regret-2 repair.
 - Gap is measured against the best method observed on the same generated instance.
 
 | Instance | Method | N | Avg makespan | Avg gap % | Avg runtime sec | Wins |
 |---|---:|---:|---:|---:|---:|---:|
-| Medium | Random-1 | 2 | 3906.32 | 61.38 | 0.0008 | 0 |
-| Medium | Random-30 | 2 | 2946.62 | 20.64 | 0.0143 | 0 |
-| Medium | VAA | 2 | 2532.86 | 4.11 | 0.0165 | 0 |
-| Medium | Paper-SA-RL5-300 | 2 | 2475.16 | 1.61 | 0.2040 | 0 |
-| Medium | DestAgent-RL-150 | 2 | 2467.44 | 1.26 | 1.6092 | 0 |
-| Medium | CargoMatrix-RL-150 | 2 | 2455.24 | 0.76 | 1.6257 | 1 |
-| Medium | TopLoad-CargoMatrix-RL-150 | 2 | 2472.70 | 1.51 | 1.6536 | 0 |
-| Medium | CPG-ALNS-300 | 2 | 2447.61 | 0.51 | 14.0964 | 0 |
-| Medium | TopLoad-CargoMatrix-RL-150+CPG-ALNS-300 | 2 | 2443.53 | 0.42 | 14.9037 | 1 |
-| Big | Random-1 | 2 | 5263.53 | 31.17 | 0.0007 | 0 |
-| Big | Random-30 | 2 | 4919.70 | 22.49 | 0.0206 | 0 |
-| Big | VAA | 2 | 4144.19 | 3.19 | 0.0430 | 0 |
-| Big | Paper-SA-RL5-300 | 2 | 4102.77 | 2.14 | 0.2609 | 0 |
-| Big | DestAgent-RL-150 | 2 | 4061.38 | 1.11 | 4.2136 | 0 |
-| Big | CargoMatrix-RL-150 | 2 | 4050.11 | 0.84 | 4.3351 | 1 |
-| Big | TopLoad-CargoMatrix-RL-150 | 2 | 4046.90 | 0.75 | 4.4010 | 0 |
-| Big | CPG-ALNS-300 | 2 | 4053.05 | 0.89 | 64.3446 | 1 |
-| Big | TopLoad-CargoMatrix-RL-150+CPG-ALNS-300 | 2 | 4042.78 | 0.65 | 72.9063 | 0 |
+| Medium | Random-1 | 2 | 3906.32 | 62.13 | 0.0004 | 0 |
+| Medium | Random-30 | 2 | 2946.62 | 21.17 | 0.0128 | 0 |
+| Medium | VAA | 2 | 2532.86 | 4.57 | 0.0165 | 0 |
+| Medium | Paper-SA-RL5-300 | 2 | 2475.16 | 2.06 | 0.2196 | 0 |
+| Medium | DestAgent-RL-150 | 2 | 2467.44 | 1.71 | 1.7087 | 0 |
+| Medium | CargoMatrix-RL-150 | 2 | 2455.24 | 1.21 | 1.6264 | 0 |
+| Medium | TopLoad-CargoMatrix-RL-150 | 2 | 2472.70 | 1.96 | 1.6025 | 0 |
+| Medium | GraphCargoMatrix-RL-150 | 2 | 2452.70 | 1.02 | 5.1951 | 1 |
+| Medium | CPG-ALNS-300 | 2 | 2447.61 | 0.95 | 14.0938 | 0 |
+| Medium | TopLoad-CargoMatrix-RL-150+CPG-ALNS-300 | 2 | 2443.53 | 0.87 | 14.8762 | 1 |
+| Big | Random-1 | 2 | 5263.53 | 31.17 | 0.0006 | 0 |
+| Big | Random-30 | 2 | 4919.70 | 22.49 | 0.0193 | 0 |
+| Big | VAA | 2 | 4144.19 | 3.19 | 0.0400 | 0 |
+| Big | Paper-SA-RL5-300 | 2 | 4102.77 | 2.14 | 0.2383 | 0 |
+| Big | DestAgent-RL-150 | 2 | 4061.38 | 1.11 | 4.2261 | 0 |
+| Big | CargoMatrix-RL-150 | 2 | 4050.11 | 0.84 | 4.3942 | 1 |
+| Big | TopLoad-CargoMatrix-RL-150 | 2 | 4046.90 | 0.75 | 4.3350 | 0 |
+| Big | GraphCargoMatrix-RL-150 | 2 | 4054.38 | 0.95 | 16.9459 | 0 |
+| Big | CPG-ALNS-300 | 2 | 4053.05 | 0.89 | 71.1340 | 1 |
+| Big | TopLoad-CargoMatrix-RL-150+CPG-ALNS-300 | 2 | 4042.78 | 0.65 | 78.3342 | 0 |
 
 Raw observations are saved in `outputs/scaled_door_results.csv`.

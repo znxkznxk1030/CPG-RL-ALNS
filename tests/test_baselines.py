@@ -14,6 +14,7 @@ from crossdock_solver.baselines.destination_agent_rl import (
     run_destination_agent_rl,
 )
 from crossdock_solver.baselines.graph_cargo_rl import (
+    DOOR_FEATURES,
     GRAPH_OBS_SIZE,
     GraphCargoRLConfig,
     _build_graph_state,
@@ -181,6 +182,7 @@ def test_graph_cargo_state_is_variable_size_with_fixed_encoding() -> None:
         remaining_destinations=list(small.destinations),
         available_trucks=set(small.all_trucks),
         assigned_count=0,
+        reference_solution=vaa_solution(small),
     )
     medium_state = _build_graph_state(
         medium,
@@ -188,13 +190,36 @@ def test_graph_cargo_state_is_variable_size_with_fixed_encoding() -> None:
         remaining_destinations=list(medium.destinations),
         available_trucks=set(medium.all_trucks),
         assigned_count=0,
+        reference_solution=vaa_solution(medium),
     )
 
     assert small_state.truck_nodes.shape[0] != medium_state.truck_nodes.shape[0]
     assert small_state.destination_nodes.shape[0] != medium_state.destination_nodes.shape[0]
     assert small_state.door_nodes.shape[0] != medium_state.door_nodes.shape[0]
+    assert small_state.door_nodes.shape[1] == DOOR_FEATURES
     assert _encode_graph_state(small_state).shape == (GRAPH_OBS_SIZE,)
     assert _encode_graph_state(medium_state).shape == (GRAPH_OBS_SIZE,)
+
+
+def test_graph_cargo_state_includes_door_release_and_workload() -> None:
+    instance = make_toy_instance()
+    reference_solution = vaa_solution(instance)
+    state = _build_graph_state(
+        instance,
+        current_destination=instance.destinations[0],
+        remaining_destinations=list(instance.destinations),
+        available_trucks=set(instance.all_trucks),
+        assigned_count=0,
+        reference_solution=reference_solution,
+    )
+
+    release_feature = state.door_nodes[:, 3]
+    workload_feature = state.door_nodes[:, 4]
+    utilization_feature = state.door_nodes[:, 5]
+
+    assert release_feature.max() > 0.0
+    assert workload_feature.max() > 0.0
+    assert utilization_feature.max() > 0.0
 
 
 def test_graph_cargo_rl_baseline_runs() -> None:
