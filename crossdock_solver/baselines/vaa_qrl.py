@@ -1,0 +1,340 @@
+from __future__ import annotations
+
+from dataclasses import dataclass
+import random
+import time
+from typing import Iterator
+
+from crossdock_solver.alns.acceptance import accept_by_sa
+from crossdock_solver.baselines.paper_sa_rl import (
+    NEIGHBORHOODS,
+    _select_action,
+    _state_from_no_improvement,
+)
+from crossdock_solver.baselines.random_baseline import BaselineRun
+from crossdock_solver.baselines.vaa import vaa_solution
+from crossdock_solver.core.evaluator import evaluate_solution
+from crossdock_solver.core.fast_evaluator import FastEvaluator, FastResult
+from crossdock_solver.core.solution import Solution
+from crossdock_solver.data.instance import CrossDockInstance, DestinationId, DoorId, TruckId
+
+
+EPSILON = 1e-9
+
+
+@dataclass
+class VaaQRLConfig:
+    """VAA-initialized Q-learning iterated local search configuration.
+
+    The model keeps the paper's Q-learning operator-selection frame and extends
+    it with critical-door guided operators, a new-best shaped reward, restart
+    with reheating on stagnation, and a deterministic descent polish applied to
+    every new best solution.
+    """
+
+    max_iterations: int = 300
+    time_budget_sec: float | None = None
+    thresholds: tuple[int, int, int, int] = (5, 10, 15, 20)
+    learning_rate: float = 0.3
+    discount_factor: float = 0.9
+    random_selection_prob: float = 0.10
+    roulette_selection_prob: float = 0.20
+    initial_temperature: float | None = None
+    cooling_rate: float = 0.995
+    restart_after: int = 30
+    restart_kick: int = 3
+    reheat_ratio: float = 0.02
+    new_best_reward: float = 2.0
+    seed: int | None = None
+    name: str = "VAA-QRL"
+
+
+def run_vaa_qrl(
+    instance: CrossDockInstance,
+    config: VaaQRLConfig | None = None,
+    *,
+    initial_solution: Solution | None = None,
+) -> BaselineRun:
+    """Run the VAA + Q-learning guided iterated local search model.
+
+    Structure:
+    1. VAA constructive initial solution, polished by best-improvement descent.
+    2. Q-learning over no-improvement states selects a move operator among the
+       paper neighborhoods plus critical-door guided operators.
+    3. SA acceptance with restart-from-best and reheating on stagnation.
+    4. Every new best solution is polished by the same descent.
+    """
+
+    config = config or VaaQRLConfig()
+    rng = random.Random(config.seed)
+    start_time = time.perf_counter()
+    deadline = (
+        start_time + config.time_budget_sec if config.time_budget_sec is not None else None
+    )
+    fast = FastEvaluator(instance)
+
+    current = initial_solution.copy() if initial_solution is not None else vaa_solution(instance)
+    current_result = fast.evaluate(current)
+    current, current_result = _descent(instance, current, current_result, fast, deadline)
+    best = current.copy()
+    best_result = current_result
+    temperature = (
+        config.initial_temperature
+        if config.initial_temperature is not None
+        else max(1.0, 0.05 * current_result.makespan)
+    )
+
+    def _guided_relocate(inst, solution, move_rng):
+        return _critical_outbound_relocate(inst, solution, move_rng, fast)
+
+    def _guided_destination_swap(inst, solution, move_rng):
+        return _critical_destination_swap(inst, solution, move_rng, fast)
+
+    guided: dict[str, object] = {
+        "g1_critical_outbound_relocate": _guided_relocate,
+        "g2_critical_destination_swap": _guided_destination_swap,
+    }
+    actions = (*NEIGHBORHOODS, *guided)
+    q_values = {
+        (state, action): 0.0
+        for state in range(1, 6)
+        for action in actions
+    }
+    no_improvement_count = 0
+    since_best = 0
+
+    for _ in range(config.max_iterations):
+        if (
+            config.time_budget_sec is not None
+            and time.perf_counter() - start_time >= config.time_budget_sec
+        ):
+            break
+        state = _state_from_no_improvement(no_improvement_count, config.thresholds)
+        action = _select_action(
+            state,
+            actions,
+            q_values,
+            rng,
+            random_prob=config.random_selection_prob,
+            roulette_prob=config.roulette_selection_prob,
+        )
+
+        operator = NEIGHBORHOODS.get(action) or guided[action]
+        candidate = operator(instance, current, rng)
+        candidate_result = fast.evaluate(candidate)
+
+        if candidate_result.makespan < best_result.makespan - EPSILON:
+            candidate, candidate_result = _descent(
+                instance, candidate, candidate_result, fast, deadline
+            )
+            best = candidate.copy()
+            best_result = candidate_result
+            reward = config.new_best_reward
+            since_best = 0
+        else:
+            reward = 1.0 if candidate_result.makespan <= current_result.makespan + EPSILON else 0.0
+            since_best += 1
+
+        next_no_improvement = (
+            0 if candidate_result.makespan <= current_result.makespan + EPSILON else no_improvement_count + 1
+        )
+        next_state = _state_from_no_improvement(next_no_improvement, config.thresholds)
+        q_values[(state, action)] += config.learning_rate * (
+            reward
+            + config.discount_factor * max(q_values[(next_state, next_action)] for next_action in actions)
+            - q_values[(state, action)]
+        )
+
+        if accept_by_sa(current_result.makespan, candidate_result.makespan, temperature, rng):
+            current = candidate
+            current_result = candidate_result
+
+        no_improvement_count = next_no_improvement
+        temperature *= config.cooling_rate
+
+        if since_best >= config.restart_after:
+            current = best.copy()
+            for _ in range(config.restart_kick):
+                kick = NEIGHBORHOODS[rng.choice(tuple(NEIGHBORHOODS))]
+                current = kick(instance, current, rng)
+            current_result = fast.evaluate(current)
+            temperature = max(temperature, config.reheat_ratio * best_result.makespan)
+            since_best = 0
+            no_improvement_count = 0
+
+    best, _ = _descent(instance, best, best_result, fast, deadline)
+
+    return BaselineRun(
+        name=f"{config.name}-{config.max_iterations}",
+        solution=best,
+        result=evaluate_solution(instance, best),
+        runtime_sec=time.perf_counter() - start_time,
+        samples=config.max_iterations,
+    )
+
+
+def vaa_qrl_solution(
+    instance: CrossDockInstance,
+    *,
+    seed: int | None = None,
+    max_iterations: int = 300,
+) -> Solution:
+    return run_vaa_qrl(
+        instance,
+        VaaQRLConfig(max_iterations=max_iterations, seed=seed),
+    ).solution
+
+
+def _descent(
+    instance: CrossDockInstance,
+    solution: Solution,
+    result: FastResult,
+    fast: FastEvaluator,
+    deadline: float | None = None,
+) -> tuple[Solution, FastResult]:
+    """Best-improvement descent over relocation and swap moves."""
+
+    current = solution.copy()
+    current_result = result
+
+    while True:
+        best_move: Solution | None = None
+        best_move_result = current_result
+        for move in _descent_moves(instance, current):
+            if deadline is not None and time.perf_counter() >= deadline:
+                if best_move is not None and best_move_result.makespan < current_result.makespan:
+                    return best_move, best_move_result
+                return current, current_result
+            move_result = fast.evaluate(move)
+            if move_result.makespan < best_move_result.makespan - EPSILON:
+                best_move = move
+                best_move_result = move_result
+        if best_move is None:
+            return current, current_result
+        current = best_move
+        current_result = best_move_result
+
+
+def _descent_moves(instance: CrossDockInstance, solution: Solution) -> Iterator[Solution]:
+    for truck in instance.outbound_trucks:
+        yield from _relocations(instance, solution, truck)
+
+    for first_idx, first in enumerate(instance.compound_trucks):
+        for second in instance.compound_trucks[first_idx + 1:]:
+            yield _compound_doors_swapped(solution, first, second)
+
+    occupied = {door for _, door in solution.compound_assignment.values()}
+    free_doors = [door for door in instance.doors if door not in occupied]
+    for compound in instance.compound_trucks:
+        destination, _ = solution.compound_assignment[compound]
+        for door in free_doors:
+            candidate = solution.copy()
+            candidate.compound_assignment[compound] = (destination, door)
+            yield candidate
+
+    all_trucks = instance.all_trucks
+    for first_idx, first in enumerate(all_trucks):
+        for second in all_trucks[first_idx + 1:]:
+            yield _destinations_swapped(solution, first, second)
+
+
+def _relocations(
+    instance: CrossDockInstance,
+    solution: Solution,
+    truck: TruckId,
+) -> Iterator[Solution]:
+    current_door = solution.outbound_assignment[truck][1]
+    current_position = solution.door_sequences[current_door].index(truck)
+    for door in instance.doors:
+        slots = len(solution.door_sequences.get(door, []))
+        if door == current_door:
+            positions = [p for p in range(slots) if p != current_position]
+        else:
+            positions = list(range(slots + 1))
+        for position in positions:
+            yield _relocated(solution, truck, door, position)
+
+
+def _relocated(solution: Solution, truck: TruckId, door: DoorId, position: int) -> Solution:
+    candidate = solution.copy()
+    destination, current_door = candidate.outbound_assignment[truck]
+    candidate.door_sequences[current_door].remove(truck)
+    candidate.outbound_assignment[truck] = (destination, door)
+    candidate.door_sequences.setdefault(door, []).insert(position, truck)
+    return candidate
+
+
+def _compound_doors_swapped(solution: Solution, first: TruckId, second: TruckId) -> Solution:
+    candidate = solution.copy()
+    first_destination, first_door = candidate.compound_assignment[first]
+    second_destination, second_door = candidate.compound_assignment[second]
+    candidate.compound_assignment[first] = (first_destination, second_door)
+    candidate.compound_assignment[second] = (second_destination, first_door)
+    return candidate
+
+
+def _destinations_swapped(solution: Solution, first: TruckId, second: TruckId) -> Solution:
+    candidate = solution.copy()
+    first_destination = candidate.truck_destination(first)
+    second_destination = candidate.truck_destination(second)
+    _set_destination(candidate, first, second_destination)
+    _set_destination(candidate, second, first_destination)
+    return candidate
+
+
+def _set_destination(solution: Solution, truck: TruckId, destination: DestinationId) -> None:
+    if truck in solution.compound_assignment:
+        _, door = solution.compound_assignment[truck]
+        solution.compound_assignment[truck] = (destination, door)
+    else:
+        _, door = solution.outbound_assignment[truck]
+        solution.outbound_assignment[truck] = (destination, door)
+
+
+def _critical_outbound_relocate(
+    instance: CrossDockInstance,
+    solution: Solution,
+    rng: random.Random,
+    fast: FastEvaluator,
+) -> Solution:
+    """Move an outbound truck away from the critical door to its best slot."""
+
+    if not instance.outbound_trucks:
+        return solution.copy()
+
+    result = fast.evaluate(solution)
+    sequence = solution.door_sequences.get(result.critical_door, [])
+    truck = sequence[-1] if sequence else rng.choice(instance.outbound_trucks)
+
+    best = solution.copy()
+    best_makespan = result.makespan
+    for candidate in _relocations(instance, solution, truck):
+        candidate_makespan = fast.evaluate(candidate).makespan
+        if candidate_makespan < best_makespan - EPSILON:
+            best = candidate
+            best_makespan = candidate_makespan
+    return best
+
+
+def _critical_destination_swap(
+    instance: CrossDockInstance,
+    solution: Solution,
+    rng: random.Random,
+    fast: FastEvaluator,
+) -> Solution:
+    """Swap the critical truck's destination with the best other carrier."""
+
+    result = fast.evaluate(solution)
+    critical = result.critical_truck
+
+    best = solution.copy()
+    best_makespan = result.makespan
+    for other in instance.all_trucks:
+        if other == critical:
+            continue
+        candidate = _destinations_swapped(solution, critical, other)
+        candidate_makespan = fast.evaluate(candidate).makespan
+        if candidate_makespan < best_makespan - EPSILON:
+            best = candidate
+            best_makespan = candidate_makespan
+    return best

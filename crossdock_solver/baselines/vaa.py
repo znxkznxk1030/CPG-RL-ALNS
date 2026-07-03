@@ -98,6 +98,11 @@ def _assign_compound_destinations_by_regret(
     unassigned_compounds = set(instance.compound_trucks)
     available_destinations = set(instance.destinations)
     assignment: dict[TruckId, DestinationId] = {}
+    cost_cache = {
+        (compound, destination): _compound_destination_cost(instance, compound, destination)
+        for compound in instance.compound_trucks
+        for destination in instance.destinations
+    }
 
     while unassigned_compounds:
         choices: list[RegretChoice] = []
@@ -105,7 +110,7 @@ def _assign_compound_destinations_by_regret(
         for compound in sorted(unassigned_compounds):
             costs = sorted(
                 (
-                    (_compound_destination_cost(instance, compound, destination), destination)
+                    (cost_cache[(compound, destination)], destination)
                     for destination in available_destinations
                 ),
                 key=lambda item: item[0],
@@ -124,7 +129,7 @@ def _assign_compound_destinations_by_regret(
         for destination in sorted(available_destinations):
             costs = sorted(
                 (
-                    (_compound_destination_cost(instance, compound, destination), compound)
+                    (cost_cache[(compound, destination)], compound)
                     for compound in unassigned_compounds
                 ),
                 key=lambda item: item[0],

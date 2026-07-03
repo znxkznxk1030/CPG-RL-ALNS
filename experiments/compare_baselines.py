@@ -6,17 +6,14 @@ from dataclasses import dataclass
 from pathlib import Path
 import statistics
 import sys
-import time
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from crossdock_solver.alns.loop import ALNSConfig, simple_alns
 from crossdock_solver.baselines.cargo_matrix_rl import (
     CargoMatrixRLConfig,
     run_cargo_matrix_rl,
-    run_topload_cargo_matrix_rl,
 )
 from crossdock_solver.baselines.destination_agent_rl import (
     DestinationAgentRLConfig,
@@ -27,11 +24,10 @@ from crossdock_solver.baselines.graph_cargo_rl import (
     run_graph_cargo_rl,
 )
 from crossdock_solver.baselines.paper_sa_rl import PaperSARLConfig, run_paper_sa_rl
+from crossdock_solver.baselines.vaa_qrl import VaaQRLConfig, run_vaa_qrl
 from crossdock_solver.baselines.random_baseline import random_best_of, random_one_solution
 from crossdock_solver.baselines.vaa import run_vaa
-from crossdock_solver.core.evaluator import evaluate_solution
 from crossdock_solver.data.generator import generate_random_instance
-from crossdock_solver.exact.milp import ExactMILPConfig, solve_exact_milp
 
 
 @dataclass(frozen=True)
@@ -109,24 +105,6 @@ def run_suite(
             vaa = run_vaa(instance)
             method_rows.append((vaa.name, vaa.result.makespan, vaa.runtime_sec))
 
-            if milp_time_limit_sec is not None and spec.name in milp_instance_names:
-                milp = solve_exact_milp(
-                    instance,
-                    ExactMILPConfig(
-                        time_limit_sec=milp_time_limit_sec,
-                        msg=False,
-                        name=f"MILP-CBC-{milp_time_limit_sec}s",
-                    ),
-                )
-                if milp.run is not None:
-                    method_rows.append(
-                        (
-                            milp.run.name,
-                            milp.run.result.makespan,
-                            milp.run.runtime_sec,
-                        )
-                    )
-
             paper_sa_rl = run_paper_sa_rl(
                 instance,
                 PaperSARLConfig(
@@ -175,22 +153,6 @@ def run_suite(
                 )
             )
 
-            topload_cargo_matrix_rl = run_topload_cargo_matrix_rl(
-                instance,
-                CargoMatrixRLConfig(
-                    episodes=cargo_matrix_episodes,
-                    seed=seed + 29_000,
-                ),
-                initial_solution=vaa.solution,
-            )
-            method_rows.append(
-                (
-                    topload_cargo_matrix_rl.run.name,
-                    topload_cargo_matrix_rl.run.result.makespan,
-                    topload_cargo_matrix_rl.run.runtime_sec,
-                )
-            )
-
             graph_cargo_rl = run_graph_cargo_rl(
                 instance,
                 GraphCargoRLConfig(
@@ -207,51 +169,19 @@ def run_suite(
                 )
             )
 
-            alns_start = time.perf_counter()
-            initial = vaa.solution
-            run = simple_alns(
+            vaa_qrl = run_vaa_qrl(
                 instance,
-                ALNSConfig(
-                    max_iterations=alns_iterations,
-                    destroy_size="small",
-                    repair_name="regret",
-                    regret_k=2,
-                    seed=seed + 30_000,
-                ),
-                initial_solution=initial,
-            )
-            alns_runtime = time.perf_counter() - alns_start
-            method_rows.append(
-                (
-                    f"CPG-ALNS-{alns_iterations}",
-                    run.best_result.makespan,
-                    alns_runtime,
-                )
-            )
-
-            topload_alns_start = time.perf_counter()
-            topload_alns = simple_alns(
-                instance,
-                ALNSConfig(
-                    max_iterations=alns_iterations,
-                    destroy_size="small",
-                    repair_name="regret",
-                    regret_k=2,
+                VaaQRLConfig(
+                    max_iterations=paper_iterations,
                     seed=seed + 31_000,
                 ),
-                initial_solution=topload_cargo_matrix_rl.run.solution,
-            )
-            topload_alns_runtime = (
-                topload_cargo_matrix_rl.run.runtime_sec
-                + time.perf_counter()
-                - topload_alns_start
+                initial_solution=vaa.solution,
             )
             method_rows.append(
                 (
-                    f"TopLoad-CargoMatrix-RL-{cargo_matrix_episodes}"
-                    f"+CPG-ALNS-{alns_iterations}",
-                    topload_alns.best_result.makespan,
-                    topload_alns_runtime,
+                    vaa_qrl.name,
+                    vaa_qrl.result.makespan,
+                    vaa_qrl.runtime_sec,
                 )
             )
 
@@ -279,9 +209,6 @@ def run_suite(
         paper_iterations=paper_iterations,
         destination_agent_episodes=destination_agent_episodes,
         cargo_matrix_episodes=cargo_matrix_episodes,
-        alns_iterations=alns_iterations,
-        milp_time_limit_sec=milp_time_limit_sec,
-        milp_instance_names=milp_instance_names,
         raw_filename=raw_filename,
         summary_title=summary_title,
     )
@@ -325,9 +252,6 @@ def _write_summary_markdown(
     paper_iterations: int,
     destination_agent_episodes: int,
     cargo_matrix_episodes: int,
-    alns_iterations: int,
-    milp_time_limit_sec: int | None,
-    milp_instance_names: tuple[str, ...],
     raw_filename: str,
     summary_title: str,
 ) -> None:
@@ -343,25 +267,15 @@ def _write_summary_markdown(
         f"{destination_agent_episodes} training episodes per instance.",
         "- Cargo-matrix RL baseline: VAA-ordered destination agents observe a "
         f"9 compound x 3 destination cargo matrix, {cargo_matrix_episodes} training episodes per instance.",
-        "- TopLoad-CargoMatrix-RL baseline: the active 3-destination cargo window is sorted by "
-        "remaining destination load with VAA as tie-breaker.",
         "- GraphCargoMatrix-RL baseline: variable-size truck/destination/door graph state "
-        "with cargo and door-travel edges pooled into the shared policy network.",
-        "- TopLoad-CargoMatrix-RL + CPG-ALNS: top-load cargo RL initial solution followed by "
-        f"critical-door ALNS, {alns_iterations} iterations, regret-2 repair.",
-        f"- Proposed MVP: critical-door ALNS with VAA initialization, {alns_iterations} iterations, regret-2 repair.",
+        "with cargo, door-travel, door-release, and door-workload features pooled into the shared policy network.",
+        "- VAA-QRL model: VAA initialization + Q-learning guided iterated local search "
+        f"(critical-door guided operators, new-best descent polish, restart with reheating), {paper_iterations} iterations.",
         "- Gap is measured against the best method observed on the same generated instance.",
         "",
         "| Instance | Method | N | Avg makespan | Avg gap % | Avg runtime sec | Wins |",
         "|---|---:|---:|---:|---:|---:|---:|",
     ]
-    if milp_time_limit_sec is not None and milp_instance_names:
-        lines.insert(
-            10,
-            "- MILP-CBC row is a time-limited incumbent; it is not a certified optimum "
-            "unless CBC proves optimality within the limit. "
-            f"limit={milp_time_limit_sec}s, instances={', '.join(milp_instance_names)}.",
-        )
 
     for row in _aggregate(observations, specs):
         lines.append(
@@ -392,16 +306,11 @@ def _aggregate(
         "Random-1": 0,
         "Random-30": 1,
         "VAA": 2,
-        "Exact-MILP": 3,
-        "MILP-CBC-60s": 4,
-        "MILP-CBC-120s": 4,
-        "Paper-SA-RL5-300": 5,
-        "DestAgent-RL-150": 6,
-        "CargoMatrix-RL-150": 7,
-        "TopLoad-CargoMatrix-RL-150": 8,
-        "GraphCargoMatrix-RL-150": 9,
-        "CPG-ALNS-300": 10,
-        "TopLoad-CargoMatrix-RL-150+CPG-ALNS-300": 11,
+        "Paper-SA-RL5-300": 3,
+        "DestAgent-RL-150": 4,
+        "CargoMatrix-RL-150": 5,
+        "GraphCargoMatrix-RL-150": 6,
+        "VAA-QRL-300": 7,
     }
 
     rows = []

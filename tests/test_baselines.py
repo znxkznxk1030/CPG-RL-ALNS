@@ -24,6 +24,11 @@ from crossdock_solver.baselines.graph_cargo_rl import (
 )
 from crossdock_solver.baselines.random_baseline import random_best_of, random_one_solution
 from crossdock_solver.baselines.paper_sa_rl import PaperSARLConfig, paper_sa_rl5, paper_sa_rl6, run_paper_sa_rl
+from crossdock_solver.baselines.vaa_qrl import (
+    VaaQRLConfig,
+    run_vaa_qrl,
+    vaa_qrl_solution,
+)
 from crossdock_solver.baselines.vaa import (
     _compound_destination_cost,
     _destination_load,
@@ -238,5 +243,35 @@ def test_graph_cargo_rl_baseline_runs() -> None:
 def test_graph_cargo_rl_solution_helper_returns_solution() -> None:
     instance = make_toy_instance()
     solution = graph_cargo_rl_solution(instance, seed=13, episodes=4)
+
+    check_feasible(instance, solution)
+
+
+def test_vaa_qrl_baseline_runs() -> None:
+    instance = make_toy_instance()
+    run = run_vaa_qrl(instance, VaaQRLConfig(max_iterations=20, seed=5))
+
+    check_feasible(instance, run.solution)
+    assert run.name == "VAA-QRL-20"
+    assert run.result.makespan > 0
+
+
+def test_vaa_qrl_is_not_worse_than_vaa_initialization() -> None:
+    instance = make_toy_instance()
+    initial = vaa_solution(instance)
+    vaa_makespan = evaluate_solution(instance, initial).makespan
+
+    run = run_vaa_qrl(
+        instance,
+        VaaQRLConfig(max_iterations=20, seed=5),
+        initial_solution=initial,
+    )
+
+    assert run.result.makespan <= vaa_makespan + 1e-9
+
+
+def test_vaa_qrl_solution_helper_returns_solution() -> None:
+    instance = make_toy_instance()
+    solution = vaa_qrl_solution(instance, seed=5, max_iterations=10)
 
     check_feasible(instance, solution)

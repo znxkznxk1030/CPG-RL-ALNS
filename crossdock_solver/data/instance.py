@@ -50,6 +50,26 @@ class CrossDockInstance:
             self, "door_index", {door: idx for idx, door in enumerate(self.doors)}
         )
         self.validate()
+        handling = self.flow @ self.product_time
+        units = self.flow.sum(axis=2)
+        object.__setattr__(
+            self,
+            "_handling_cache",
+            {
+                (truck, dest): float(handling[c, d])
+                for truck, c in self.compound_index.items()
+                for dest, d in self.destination_index.items()
+            },
+        )
+        object.__setattr__(
+            self,
+            "_unit_cache",
+            {
+                (truck, dest): float(units[c, d])
+                for truck, c in self.compound_index.items()
+                for dest, d in self.destination_index.items()
+            },
+        )
 
     @property
     def all_trucks(self) -> list[TruckId]:
@@ -116,10 +136,10 @@ class CrossDockInstance:
         return self.flow[self.compound_index[compound], self.destination_index[destination], :]
 
     def handling_time(self, compound: TruckId, destination: DestinationId) -> float:
-        return float(np.dot(self.flow_vector(compound, destination), self.product_time))
+        return self._handling_cache[(compound, destination)]
 
     def unit_amount(self, compound: TruckId, destination: DestinationId) -> float:
-        return float(np.sum(self.flow_vector(compound, destination)))
+        return self._unit_cache[(compound, destination)]
 
     def travel(self, source_door: DoorId, target_door: DoorId) -> float:
         return float(self.travel_time[self.door_index[source_door], self.door_index[target_door]])
