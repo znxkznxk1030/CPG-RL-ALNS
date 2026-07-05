@@ -32,6 +32,23 @@
 요청서의 `VVA`는 `VAA`(Vogel's Approximation Algorithm)의 흔한 오타로 간주하며,
 구현에는 `vva_solution()` 별칭도 제공됩니다.
 
+## 정확해 솔버와 하한
+
+- `exact/milp.py` (PuLP/CBC), `exact/cpsat.py` (OR-Tools CP-SAT): 시간창 포함 MVP
+  모델을 정확해로 풀어 최적/하한을 제공. CP-SAT는 소규모(S)에서 최적을 증명하고,
+  미증명 시에도 하한을 반환한다.
+- `exact/lower_bounds.py`: 조합적 하한(임계 트럭 체인 + 도어 면적). CP-SAT가 무력한
+  대규모(L/XL)에서 유효한(느슨한) 하한을 제공. 자세한 G1 게이트 판정은
+  `docs/scie_research_plan.md` 참조.
+
+### 환경 주의 (CP-SAT)
+
+이 환경은 pandas/pyarrow가 NumPy 1.x로 빌드되어 NumPy 2.x와 ABI 충돌한다. ortools
+`cp_model`이 pandas를 import할 때 깨진 pyarrow 네이티브가 로드되면 프로세스가
+SIGBUS로 죽는다. `exact/cpsat.py`는 정상 pandas가 없을 때 pandas/pyarrow를 최소
+스텁으로 대체해 이를 우회한다(우리 코드는 pandas 기능을 쓰지 않음). 근본 해결은
+`pip install -U pandas pyarrow` 등으로 NumPy 2 호환 빌드를 설치하는 것이다.
+
 ## 테스트 실행
 
 ```bash
@@ -41,7 +58,7 @@ python -m pytest -q
 최근 결과:
 
 ```text
-49 passed, 18 warnings in 35.81s
+61 passed, 27 warnings in 41s
 ```
 
 ## MVP 예제 실행
