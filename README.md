@@ -1,8 +1,12 @@
 # 컴파운드 트럭 크로스도킹 스케줄링 (Cross-Dock CPG-ALNS MVP)
 
 컴파운드 트럭 크로스도킹 스케줄링 연구의 MVP 구현 저장소입니다.
-연구 플랜은 `docs/scie_research_plan.md`, 시간창 변형의 문헌 신규성 스캔은
-`docs/literature_scan_tw.md`를 참고하세요.
+
+문서:
+- `docs/scie_research_plan.md` — SCIE 목표 연구 플랜(Phase 0~5, 게이트)
+- `docs/problem_definition.md` — 문제 정식화(논문↔코드 대응, 시간창 확장 수식)
+- `docs/benchmark_design.md` — 논문 실험 세팅 대조와 벤치마크 설계 결정
+- `docs/literature_scan_tw.md` — 시간창 변형 문헌 신규성 스캔
 
 구현 범위:
 
@@ -58,36 +62,50 @@ iterations:       100
 
 ## 실험 환경
 
+실험 환경은 베이스 논문(Shahmardan & Sajadieh 2020) 체제에 정합하도록 설계했다.
+상세 근거는 `docs/benchmark_design.md`, 문제 정식화는 `docs/problem_definition.md`,
+연구 플랜은 `docs/scie_research_plan.md`를 참조.
+
 ### 규모 클래스 (`crossdock_solver/data/generator.py`의 `SIZE_CLASSES`)
+
+논문 체제: 컴파운드 트럭 다수(비율 2/3), |컴파운드| = |도어|, |목적지| = 1.5·|컴파운드|.
+크기 표기는 논문과 동일한 (I, D, M) = (컴파운드, 목적지, 도어).
 
 | 항목 | S | M | L | XL |
 |---|---:|---:|---:|---:|
-| 컴파운드 트럭 | 3 | 8 | 15 | 25 |
-| 아웃바운드 트럭 | 7 | 22 | 45 | 75 |
-| 총 트럭 (= 목적지 수) | 10 | 30 | 60 | 100 |
-| 도어 | 5 | 10 | 20 | 30 |
-| 상품 종류 | 3 | 3 | 5 | 5 |
-| FastEvaluator 평가 속도 | ~10µs | ~26µs | ~45–52µs | ~107µs |
-| 본 실험(P4) wall-clock 예산 | 10s | 60s | 180s | 600s |
+| 컴파운드 트럭 (I) | 6 | 12 | 20 | 30 |
+| 아웃바운드 트럭 | 3 | 6 | 10 | 15 |
+| 목적지 (D) | 9 | 18 | 30 | 45 |
+| 도어 (M) | 6 | 12 | 20 | 30 |
+| 상품 종류 | 3 | 3 | 3 | 3 |
+| 컴파운드 비율 | 0.67 | 0.67 | 0.67 | 0.67 |
+| 시간 예산 (논문 공식) | 31s | 126s | 350s | 788s |
+| 근거 | 논문 Table 2 정확해 최대 | 중간 | 논문 Table 4 대규모 최대 | 논문 확장 |
 
-목적지 수 = 총 트럭 수는 MVP 표현의 제약(목적지당 캐리어 트럭 1대)이며,
-컴파운드 비율은 전 클래스 약 25%, 도어 수는 항상 컴파운드 수 이상입니다
-(1단계 도어 점유 제약).
+- 목적지 수 = 총 트럭 수(컴파운드+아웃바운드)는 MVP·논문 공통 제약(목적지당 캐리어 1대).
+- |컴파운드| ≤ |도어| 제약을 |컴파운드| = |도어|로 채택(도어당 컴파운드 1대, 논문 대표 구성).
+- 시간 예산 = `((|I|+|D|)/2)·|M|·0.7`초 (논문 Table 5로 검증, `characteristics.paper_time_budget`).
 
 ### 공통 생성 규칙
 
-- 화물량(flow): (컴파운드 × 목적지 × 상품)별 정수 U[0, 20]을 기본으로
-  흐름 패턴 3종 중 하나를 적용
+- 화물량(flow): (컴파운드 × 목적지 × 상품)별 정수 U[0, 20]을 기본으로 흐름 패턴 적용
   - `uniform`: 독립 균등
   - `skewed`: 파레토 가중치로 소수 목적지에 물량 집중
   - `clustered`: 컴파운드별 홈 클러스터 목적지에 물량 집중 (그 외 20% 스케일)
-- 도어 배치: 100×100 평면 균등 랜덤 좌표, 유클리드 거리/10 = 도어 간 이송 시간
-- 트럭 진입/출차 시간: 각각 U[1, 5]
+- 파라미터 프로파일 (`param_profile`):
+  - `synthetic` (기본): DE/DL ~ U[1,5], t_k ~ U[1,5], 100×100 평면 유클리드/10 이송
+  - `paper`: 논문 정합. DE/DL ~ U[0,20], t_k ~ U[3,10], I-형 선형 도어(인접 이송 = 1, |m−n|)
 - 시간창 (4수준): `none` / `loose` / `medium` / `tight`.
   무제약 makespan 추정치 H(= 총 핸들링의 2배 ÷ 도어 수)를 기준으로
   release ~ U[0, ρ·H], due = release + δ·H.
   (ρ, δ) = loose (0.10, 1.00), medium (0.25, 0.60), tight (0.50, 0.35) —
-  tight일수록 도착이 늦게 흩어지고 마감 여유가 짧아집니다.
+  tight일수록 도착이 늦게 흩어지고 마감 여유가 짧아진다.
+
+### 인스턴스 특성값 (`crossdock_solver/data/characteristics.py`)
+
+- `paper_time_budget(instance)`: 논문 시간 예산 공식 (E6 동일 시간 예산 비교용).
+- `dbpr(instance)` / `mean_dbpr`: 목적지 화물 집중도(논문 Eq. 32). 높을수록 부분하역 효과 큼.
+- `compound_fraction(instance)`: 컴파운드 트럭 비율(논문 체제 0.67~0.80).
 
 ### 벤치마크 격자와 시드 프로토콜 (`experiments/protocol.py`)
 
@@ -97,7 +115,7 @@ iterations:       100
   - `train` (100,000대): RL 정책 학습 전용
   - `tuning` (200,000대): 하이퍼파라미터 튜닝 전용
   - `test` (300,000대): 최종 보고 전용 — 실험 확정 전 실행 금지
-- 본 실험 계획: 셀당 test 인스턴스 10개 × 반복 30회
+- 본 실험 계획: 셀당 test 인스턴스 10개 × 반복 30회 (논문 반복 20회보다 엄격)
 
 ### 실험 러너 (`experiments/runner.py`)
 
@@ -111,10 +129,17 @@ from experiments.runner import Job, run_jobs
 
 jobs = [
     Job(method="VAA-QRL-300", pool="tuning", size_class="M",
-        flow_pattern="uniform", tw_tightness="medium", index=0, budget_sec=60.0)
+        flow_pattern="uniform", tw_tightness="medium", index=0, budget_sec=126.0)
 ]
 run_jobs(jobs, Path("outputs/results.jsonl"), workers=4)
 ```
+
+### 평가자 (`crossdock_solver/core/`)
+
+- `evaluator.evaluate_solution`: 정확한 기준 평가자(가용성 검사·부가 지표 포함).
+- `fast_evaluator.FastEvaluator`: 탐색용 고속 평가자. 정적 테이블 사전계산으로
+  기준 대비 makespan·지연 동일, 속도 수십 배(등가성 fuzz 테스트로 보증).
+  `objective = makespan + tardiness_weight · total_tardiness`.
 
 ## 베이스라인
 

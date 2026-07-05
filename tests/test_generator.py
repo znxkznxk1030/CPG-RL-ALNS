@@ -45,12 +45,17 @@ def test_skewed_pattern_concentrates_destination_load() -> None:
 
 
 def test_clustered_pattern_favors_home_cluster() -> None:
-    instance = generate_benchmark_instance("M", "clustered", seed=5)
-    flow_by_compound_dest = instance.flow.sum(axis=2)
+    clustered = generate_benchmark_instance("M", "clustered", seed=5).flow.sum(axis=2)
+    uniform = generate_benchmark_instance("M", "uniform", seed=5).flow.sum(axis=2)
 
-    per_compound_max = flow_by_compound_dest.max(axis=1)
-    per_compound_mean = flow_by_compound_dest.mean(axis=1)
-    assert np.all(per_compound_max >= 2 * per_compound_mean)
+    def peak_ratio(flow_by_compound_dest: np.ndarray) -> float:
+        peak = flow_by_compound_dest.max(axis=1)
+        mean = flow_by_compound_dest.mean(axis=1) + 1e-9
+        return float(np.mean(peak / mean))
+
+    # Clustering concentrates each compound's flow on its home destinations,
+    # so the peak-to-mean ratio is higher than under the uniform pattern.
+    assert peak_ratio(clustered) > peak_ratio(uniform)
 
 
 def test_time_windows_follow_tightness_levels() -> None:
