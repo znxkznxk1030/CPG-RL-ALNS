@@ -23,11 +23,12 @@ def test_pools_are_disjoint_across_all_cells() -> None:
                 assert pool_of_seed(seed) == pool
 
 
-def test_cells_cover_size_and_pattern_grid() -> None:
+def test_cells_cover_size_pattern_and_tightness_grid() -> None:
     cells = benchmark_cells()
-    assert len(cells) == 12
+    assert len(cells) == 48
     assert BenchmarkCell("S", "uniform") in cells
-    assert BenchmarkCell("XL", "clustered") in cells
+    assert BenchmarkCell("S", "uniform", "tight") in cells
+    assert BenchmarkCell("XL", "clustered", "loose") in cells
 
 
 def test_cell_instance_is_deterministic() -> None:

@@ -24,6 +24,11 @@
 | 생성기 `data/generator.py` | 소형 랜덤 생성 | 규모/시간창/흐름 패턴 파라미터화 필요 |
 | 환경 | torch, pulp 사용 가능 | ortools(CP-SAT), irace 또는 SMAC 설치 필요 |
 
+> 진행 현황 (2026-07-03): P0 완료 (FastEvaluator L급 45µs로 G0 통과, 생성기/시드
+> 프로토콜/러너 완성). P1 완료 (release/due 필드, 평가자·VAA·VAA-QRL·MILP 시간창
+> 반영, MILP-평가자 목적값 일치 검증, 무제약 회귀 동일성 확인). ortools 설치 완료,
+> CP-SAT 모델 구현이 다음 작업. 벤치마크 셀은 무제약 레벨 포함 48셀로 확정.
+
 ## Phase 0 — 실험 인프라 (2주)
 
 대규모 실험이 가능한 토대를 먼저 만든다. 이후 모든 Phase가 여기 의존한다.
@@ -107,9 +112,13 @@
 2. 튜닝된 ALNS: 기존 `alns/` 모듈에 Phase 1 연산자 반영, irace(또는 SMAC)로
    tuning pool에서 튜닝. "강한 전통 베이스라인" 역할
 3. Paper-SA-RL: 시간창 대응 버전 (공정성: 동일 연산자 풀 접근권 부여 변형도 포함)
-4. 연산자 선택 대안 (ablation 겸 베이스라인): 균등 랜덤 / ALNS 룰렛 가중치 /
+4. Q-ALNS 스타일 베이스라인 (Li et al. 2025 방법의 본 문제 이식): Q-learning이
+   destroy/repair 연산자를 적응 선택하는 ALNS. 기존 `alns/` 모듈 + Q-learning
+   선택 코드 재사용. 직접 재현이 아니라 방법 적응임을 논문에 명시
+   (그들의 문제는 storage/AGV/도어 모드 구조라 인스턴스 이식 불가, 데이터 비공개)
+5. 연산자 선택 대안 (ablation 겸 베이스라인): 균등 랜덤 / ALNS 룰렛 가중치 /
    UCB / Thompson / tabular Q / DQN — 동일 ILS 골격에서 선택기만 교체
-5. (옵션) L2D류 GNN 디스패칭 재현 — 기간 초과 시 관련연구 비교표로 대체
+6. (옵션) L2D류 GNN 디스패칭 재현 — 기간 초과 시 관련연구 비교표로 대체
 
 산출물: 베이스라인 스위트, irace 튜닝 로그(재현성 자료).
 

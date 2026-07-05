@@ -19,6 +19,7 @@ from itertools import product
 from crossdock_solver.data.generator import (
     FLOW_PATTERNS,
     SIZE_CLASSES,
+    TW_TIGHTNESS,
     generate_benchmark_instance,
 )
 from crossdock_solver.data.instance import CrossDockInstance
@@ -37,16 +38,21 @@ _CELL_STRIDE = 1_000
 class BenchmarkCell:
     size_class: str
     flow_pattern: str
+    tw_tightness: str | None = None
 
     @property
     def name(self) -> str:
-        return f"{self.size_class}-{self.flow_pattern}"
+        suffix = f"-{self.tw_tightness}" if self.tw_tightness is not None else ""
+        return f"{self.size_class}-{self.flow_pattern}{suffix}"
 
 
 def benchmark_cells() -> tuple[BenchmarkCell, ...]:
+    """Full benchmark grid: size x flow pattern x (no-TW + three tightness levels)."""
+
+    tightness_levels: tuple[str | None, ...] = (None, *TW_TIGHTNESS)
     return tuple(
-        BenchmarkCell(size_class=size, flow_pattern=pattern)
-        for size, pattern in product(SIZE_CLASSES, FLOW_PATTERNS)
+        BenchmarkCell(size_class=size, flow_pattern=pattern, tw_tightness=tightness)
+        for size, pattern, tightness in product(SIZE_CLASSES, FLOW_PATTERNS, tightness_levels)
     )
 
 
@@ -71,6 +77,7 @@ def cell_instance(pool: str, cell: BenchmarkCell, index: int) -> CrossDockInstan
         cell.size_class,
         cell.flow_pattern,
         seed=cell_seed(pool, cell, index),
+        tw_tightness=cell.tw_tightness,
     )
 
 

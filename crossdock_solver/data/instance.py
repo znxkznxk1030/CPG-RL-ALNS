@@ -31,6 +31,8 @@ class CrossDockInstance:
     travel_time: np.ndarray
     enter_time: dict[TruckId, float]
     leave_time: dict[TruckId, float]
+    release_time: dict[TruckId, float] | None = None
+    due_time: dict[TruckId, float] | None = None
     compound_index: dict[TruckId, int] = field(init=False)
     destination_index: dict[DestinationId, int] = field(init=False)
     product_index: dict[ProductId, int] = field(init=False)
@@ -49,6 +51,14 @@ class CrossDockInstance:
         object.__setattr__(
             self, "door_index", {door: idx for idx, door in enumerate(self.doors)}
         )
+        if self.release_time is None:
+            object.__setattr__(
+                self, "release_time", {truck: 0.0 for truck in self.all_trucks}
+            )
+        if self.due_time is None:
+            object.__setattr__(
+                self, "due_time", {truck: float("inf") for truck in self.all_trucks}
+            )
         self.validate()
         handling = self.flow @ self.product_time
         units = self.flow.sum(axis=2)
@@ -122,6 +132,18 @@ class CrossDockInstance:
             raise ValueError(f"enter_time missing trucks: {sorted(missing_enter)}")
         if missing_leave:
             raise ValueError(f"leave_time missing trucks: {sorted(missing_leave)}")
+
+        missing_release = set(self.all_trucks) - set(self.release_time)
+        missing_due = set(self.all_trucks) - set(self.due_time)
+        if missing_release:
+            raise ValueError(f"release_time missing trucks: {sorted(missing_release)}")
+        if missing_due:
+            raise ValueError(f"due_time missing trucks: {sorted(missing_due)}")
+        for truck in self.all_trucks:
+            if self.release_time[truck] < 0:
+                raise ValueError(f"release_time must be non-negative for {truck}")
+            if self.due_time[truck] < self.release_time[truck]:
+                raise ValueError(f"due_time must be at least release_time for {truck}")
 
         if len(self.compound_trucks) + len(self.outbound_trucks) != len(self.destinations):
             raise ValueError(

@@ -35,17 +35,23 @@ def _paper_sa_rl(iterations: int) -> MethodFn:
     return method
 
 
-def _vaa_qrl(iterations: int) -> MethodFn:
+def _vaa_qrl(iterations: int, tardiness_weight: float = 0.0) -> MethodFn:
     def method(instance: CrossDockInstance, seed: int, budget_sec: float | None) -> dict:
         run = run_vaa_qrl(
             instance,
             VaaQRLConfig(
                 max_iterations=iterations,
                 time_budget_sec=budget_sec,
+                tardiness_weight=tardiness_weight,
                 seed=seed,
             ),
         )
-        return {"makespan": run.result.makespan, "runtime_sec": run.runtime_sec}
+        return {
+            "makespan": run.result.makespan,
+            "total_tardiness": run.result.total_tardiness,
+            "objective": run.result.makespan + tardiness_weight * run.result.total_tardiness,
+            "runtime_sec": run.runtime_sec,
+        }
 
     return method
 
@@ -56,4 +62,6 @@ METHOD_REGISTRY: dict[str, MethodFn] = {
     "VAA-QRL-50": _vaa_qrl(50),
     "VAA-QRL-300": _vaa_qrl(300),
     "VAA-QRL-1000": _vaa_qrl(1000),
+    "VAA-QRL-300-tw1": _vaa_qrl(300, tardiness_weight=1.0),
+    "VAA-QRL-1000-tw1": _vaa_qrl(1000, tardiness_weight=1.0),
 }

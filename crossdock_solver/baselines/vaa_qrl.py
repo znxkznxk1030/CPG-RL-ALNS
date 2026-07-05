@@ -34,6 +34,7 @@ class VaaQRLConfig:
 
     max_iterations: int = 300
     time_budget_sec: float | None = None
+    tardiness_weight: float = 0.0
     thresholds: tuple[int, int, int, int] = (5, 10, 15, 20)
     learning_rate: float = 0.3
     discount_factor: float = 0.9
@@ -71,7 +72,7 @@ def run_vaa_qrl(
     deadline = (
         start_time + config.time_budget_sec if config.time_budget_sec is not None else None
     )
-    fast = FastEvaluator(instance)
+    fast = FastEvaluator(instance, tardiness_weight=config.tardiness_weight)
 
     current = initial_solution.copy() if initial_solution is not None else vaa_solution(instance)
     current_result = fast.evaluate(current)
@@ -81,7 +82,7 @@ def run_vaa_qrl(
     temperature = (
         config.initial_temperature
         if config.initial_temperature is not None
-        else max(1.0, 0.05 * current_result.makespan)
+        else max(1.0, 0.05 * current_result.objective)
     )
 
     def _guided_relocate(inst, solution, move_rng):
@@ -123,7 +124,7 @@ def run_vaa_qrl(
         candidate = operator(instance, current, rng)
         candidate_result = fast.evaluate(candidate)
 
-        if candidate_result.makespan < best_result.makespan - EPSILON:
+        if candidate_result.objective < best_result.objective - EPSILON:
             candidate, candidate_result = _descent(
                 instance, candidate, candidate_result, fast, deadline
             )
@@ -132,11 +133,11 @@ def run_vaa_qrl(
             reward = config.new_best_reward
             since_best = 0
         else:
-            reward = 1.0 if candidate_result.makespan <= current_result.makespan + EPSILON else 0.0
+            reward = 1.0 if candidate_result.objective <= current_result.objective + EPSILON else 0.0
             since_best += 1
 
         next_no_improvement = (
-            0 if candidate_result.makespan <= current_result.makespan + EPSILON else no_improvement_count + 1
+            0 if candidate_result.objective <= current_result.objective + EPSILON else no_improvement_count + 1
         )
         next_state = _state_from_no_improvement(next_no_improvement, config.thresholds)
         q_values[(state, action)] += config.learning_rate * (
@@ -145,7 +146,7 @@ def run_vaa_qrl(
             - q_values[(state, action)]
         )
 
-        if accept_by_sa(current_result.makespan, candidate_result.makespan, temperature, rng):
+        if accept_by_sa(current_result.objective, candidate_result.objective, temperature, rng):
             current = candidate
             current_result = candidate_result
 
@@ -158,7 +159,7 @@ def run_vaa_qrl(
                 kick = NEIGHBORHOODS[rng.choice(tuple(NEIGHBORHOODS))]
                 current = kick(instance, current, rng)
             current_result = fast.evaluate(current)
-            temperature = max(temperature, config.reheat_ratio * best_result.makespan)
+            temperature = max(temperature, config.reheat_ratio * best_result.objective)
             since_best = 0
             no_improvement_count = 0
 
@@ -202,11 +203,11 @@ def _descent(
         best_move_result = current_result
         for move in _descent_moves(instance, current):
             if deadline is not None and time.perf_counter() >= deadline:
-                if best_move is not None and best_move_result.makespan < current_result.makespan:
+                if best_move is not None and best_move_result.objective < current_result.objective:
                     return best_move, best_move_result
                 return current, current_result
             move_result = fast.evaluate(move)
-            if move_result.makespan < best_move_result.makespan - EPSILON:
+            if move_result.objective < best_move_result.objective - EPSILON:
                 best_move = move
                 best_move_result = move_result
         if best_move is None:
@@ -307,12 +308,12 @@ def _critical_outbound_relocate(
     truck = sequence[-1] if sequence else rng.choice(instance.outbound_trucks)
 
     best = solution.copy()
-    best_makespan = result.makespan
+    best_objective = result.objective
     for candidate in _relocations(instance, solution, truck):
-        candidate_makespan = fast.evaluate(candidate).makespan
-        if candidate_makespan < best_makespan - EPSILON:
+        candidate_objective = fast.evaluate(candidate).objective
+        if candidate_objective < best_objective - EPSILON:
             best = candidate
-            best_makespan = candidate_makespan
+            best_objective = candidate_objective
     return best
 
 
@@ -328,13 +329,13 @@ def _critical_destination_swap(
     critical = result.critical_truck
 
     best = solution.copy()
-    best_makespan = result.makespan
+    best_objective = result.objective
     for other in instance.all_trucks:
         if other == critical:
             continue
         candidate = _destinations_swapped(solution, critical, other)
-        candidate_makespan = fast.evaluate(candidate).makespan
-        if candidate_makespan < best_makespan - EPSILON:
+        candidate_objective = fast.evaluate(candidate).objective
+        if candidate_objective < best_objective - EPSILON:
             best = candidate
-            best_makespan = candidate_makespan
+            best_objective = candidate_objective
     return best

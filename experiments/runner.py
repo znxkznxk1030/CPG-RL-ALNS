@@ -27,12 +27,14 @@ class Job:
     index: int
     rep: int = 0
     budget_sec: float | None = None
+    tw_tightness: str | None = None
 
     @property
     def key(self) -> str:
+        tightness = self.tw_tightness or "none"
         return (
             f"{self.method}|{self.pool}|{self.size_class}|{self.flow_pattern}"
-            f"|{self.index}|{self.rep}"
+            f"|{tightness}|{self.index}|{self.rep}"
         )
 
 
@@ -66,7 +68,11 @@ def run_jobs(
 
 
 def _execute(job: Job) -> dict:
-    cell = BenchmarkCell(size_class=job.size_class, flow_pattern=job.flow_pattern)
+    cell = BenchmarkCell(
+        size_class=job.size_class,
+        flow_pattern=job.flow_pattern,
+        tw_tightness=job.tw_tightness,
+    )
     instance = cell_instance(job.pool, cell, job.index)
     instance_seed = cell_seed(job.pool, cell, job.index)
     method_seed = instance_seed * 100 + job.rep

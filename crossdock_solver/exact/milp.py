@@ -17,6 +17,7 @@ from crossdock_solver.data.instance import CrossDockInstance, DestinationId, Doo
 class ExactMILPConfig:
     time_limit_sec: int | None = 120
     msg: bool = False
+    tardiness_weight: float = 0.0
     name: str = "Exact-MILP"
 
 
@@ -102,7 +103,21 @@ def solve_exact_milp(
     outbound_finish = pulp.LpVariable.dicts("outbound_finish", list(outbounds), lowBound=0)
     cmax = pulp.LpVariable("makespan", lowBound=0)
 
-    model += cmax
+    due_trucks = [
+        truck
+        for truck in instance.all_trucks
+        if instance.due_time[truck] != float("inf")
+    ]
+    tardiness = pulp.LpVariable.dicts("tardiness", due_trucks, lowBound=0)
+
+    model += cmax + config.tardiness_weight * pulp.lpSum(
+        tardiness[truck] for truck in due_trucks
+    )
+
+    compound_set = set(compounds)
+    for truck in due_trucks:
+        finish_var = compound_finish[truck] if truck in compound_set else outbound_finish[truck]
+        model += tardiness[truck] >= finish_var - instance.due_time[truck]
 
     compound_door = {
         (compound, door): pulp.lpSum(x[compound][destination][door] for destination in destinations)
@@ -130,7 +145,8 @@ def solve_exact_milp(
             == 1
         )
         model += unload_finish[compound] == (
-            instance.enter_time[compound]
+            instance.release_time[compound]
+            + instance.enter_time[compound]
             + total_handling[compound]
             - pulp.lpSum(
                 handling[(compound, destination)] * x[compound][destination][door]
@@ -160,6 +176,7 @@ def solve_exact_milp(
             == 1
         )
         model += cmax >= outbound_finish[outbound]
+        model += outbound_start[outbound] >= instance.release_time[outbound]
 
     for destination in destinations:
         model += (
@@ -357,7 +374,11 @@ def _big_m(instance: CrossDockInstance) -> float:
         for compound in instance.compound_trucks
         for destination in instance.destinations
     )
-    max_enter_leave = sum(instance.enter_time.values()) + sum(instance.leave_time.values())
+    max_enter_leave = (
+        sum(instance.enter_time.values())
+        + sum(instance.leave_time.values())
+        + max(instance.release_time.values(), default=0.0)
+    )
     max_travel = max(
         instance.travel(source, target)
         for source in instance.doors

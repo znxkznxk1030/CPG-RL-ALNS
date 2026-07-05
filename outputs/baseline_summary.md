@@ -13,29 +13,29 @@ Settings:
 
 | Instance | Method | N | Avg makespan | Avg gap % | Avg runtime sec | Wins |
 |---|---:|---:|---:|---:|---:|---:|
-| Tiny | Random-1 | 3 | 436.43 | 17.80 | 0.0002 | 0 |
-| Tiny | Random-30 | 3 | 420.32 | 9.06 | 0.0023 | 0 |
+| Tiny | Random-1 | 3 | 436.43 | 17.80 | 0.0001 | 0 |
+| Tiny | Random-30 | 3 | 420.32 | 9.06 | 0.0014 | 0 |
 | Tiny | VAA | 3 | 430.65 | 13.78 | 0.0002 | 0 |
-| Tiny | Paper-SA-RL5-300 | 3 | 379.49 | 0.67 | 0.0275 | 1 |
-| Tiny | DestAgent-RL-150 | 3 | 385.65 | 2.98 | 0.0916 | 1 |
-| Tiny | CargoMatrix-RL-150 | 3 | 385.65 | 3.02 | 0.0797 | 1 |
-| Tiny | GraphCargoMatrix-RL-150 | 3 | 388.99 | 3.70 | 0.8653 | 0 |
-| Tiny | VAA-QRL-300 | 3 | 377.65 | 0.00 | 0.0141 | 3 |
+| Tiny | Paper-SA-RL5-300 | 3 | 379.49 | 0.67 | 0.0157 | 1 |
+| Tiny | DestAgent-RL-150 | 3 | 385.65 | 2.98 | 0.0476 | 1 |
+| Tiny | CargoMatrix-RL-150 | 3 | 385.65 | 3.02 | 0.0543 | 1 |
+| Tiny | GraphCargoMatrix-RL-150 | 3 | 388.99 | 3.70 | 0.2747 | 0 |
+| Tiny | VAA-QRL-300 | 3 | 377.65 | 0.00 | 0.0104 | 3 |
 | Small | Random-1 | 3 | 1624.05 | 38.89 | 0.0001 | 0 |
-| Small | Random-30 | 3 | 1370.93 | 15.36 | 0.0020 | 0 |
+| Small | Random-30 | 3 | 1370.93 | 15.36 | 0.0019 | 0 |
 | Small | VAA | 3 | 1275.57 | 7.18 | 0.0003 | 0 |
-| Small | Paper-SA-RL5-300 | 3 | 1195.21 | 0.53 | 0.0324 | 1 |
-| Small | DestAgent-RL-150 | 3 | 1239.93 | 4.05 | 0.1375 | 0 |
-| Small | CargoMatrix-RL-150 | 3 | 1229.26 | 3.29 | 0.1110 | 0 |
-| Small | GraphCargoMatrix-RL-150 | 3 | 1236.44 | 3.73 | 1.0288 | 0 |
-| Small | VAA-QRL-300 | 3 | 1190.34 | 0.05 | 0.0257 | 2 |
-| Medium-lite | Random-1 | 3 | 2169.29 | 35.73 | 0.0002 | 0 |
-| Medium-lite | Random-30 | 3 | 1810.84 | 11.90 | 0.0038 | 0 |
-| Medium-lite | VAA | 3 | 1751.43 | 8.74 | 0.0009 | 0 |
-| Medium-lite | Paper-SA-RL5-300 | 3 | 1643.75 | 1.84 | 0.0515 | 0 |
-| Medium-lite | DestAgent-RL-150 | 3 | 1634.55 | 1.36 | 0.1922 | 0 |
-| Medium-lite | CargoMatrix-RL-150 | 3 | 1656.78 | 2.80 | 0.1304 | 0 |
-| Medium-lite | GraphCargoMatrix-RL-150 | 3 | 1639.07 | 1.60 | 1.7166 | 0 |
-| Medium-lite | VAA-QRL-300 | 3 | 1613.51 | 0.00 | 0.0461 | 3 |
+| Small | Paper-SA-RL5-300 | 3 | 1195.21 | 0.53 | 0.0240 | 1 |
+| Small | DestAgent-RL-150 | 3 | 1239.93 | 4.05 | 0.0782 | 0 |
+| Small | CargoMatrix-RL-150 | 3 | 1229.26 | 3.29 | 0.0855 | 0 |
+| Small | GraphCargoMatrix-RL-150 | 3 | 1236.44 | 3.73 | 0.5086 | 0 |
+| Small | VAA-QRL-300 | 3 | 1190.34 | 0.05 | 0.0147 | 2 |
+| Medium-lite | Random-1 | 3 | 2169.29 | 35.73 | 0.0001 | 0 |
+| Medium-lite | Random-30 | 3 | 1810.84 | 11.90 | 0.0024 | 0 |
+| Medium-lite | VAA | 3 | 1751.43 | 8.74 | 0.0005 | 0 |
+| Medium-lite | Paper-SA-RL5-300 | 3 | 1643.75 | 1.84 | 0.0362 | 0 |
+| Medium-lite | DestAgent-RL-150 | 3 | 1634.55 | 1.36 | 0.1291 | 0 |
+| Medium-lite | CargoMatrix-RL-150 | 3 | 1656.78 | 2.80 | 0.1487 | 0 |
+| Medium-lite | GraphCargoMatrix-RL-150 | 3 | 1639.07 | 1.60 | 0.9556 | 0 |
+| Medium-lite | VAA-QRL-300 | 3 | 1613.51 | 0.00 | 0.0274 | 3 |
 
 Raw observations are saved in `outputs/baseline_results.csv`.

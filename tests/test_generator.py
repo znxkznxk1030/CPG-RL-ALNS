@@ -53,6 +53,31 @@ def test_clustered_pattern_favors_home_cluster() -> None:
     assert np.all(per_compound_max >= 2 * per_compound_mean)
 
 
+def test_time_windows_follow_tightness_levels() -> None:
+    unconstrained = generate_benchmark_instance("S", "uniform", seed=9)
+    assert all(value == 0.0 for value in unconstrained.release_time.values())
+    assert all(value == float("inf") for value in unconstrained.due_time.values())
+
+    loose = generate_benchmark_instance("S", "uniform", seed=9, tw_tightness="loose")
+    tight = generate_benchmark_instance("S", "uniform", seed=9, tw_tightness="tight")
+
+    for instance in (loose, tight):
+        for truck in instance.all_trucks:
+            assert instance.release_time[truck] >= 0.0
+            assert instance.due_time[truck] >= instance.release_time[truck]
+            assert instance.due_time[truck] < float("inf")
+
+    def mean_width(instance) -> float:
+        widths = [
+            instance.due_time[truck] - instance.release_time[truck]
+            for truck in instance.all_trucks
+        ]
+        return sum(widths) / len(widths)
+
+    assert mean_width(tight) < mean_width(loose)
+    assert max(tight.release_time.values()) > max(loose.release_time.values())
+
+
 def test_invalid_arguments_raise() -> None:
     with pytest.raises(ValueError):
         generate_benchmark_instance("XXL", "uniform", seed=1)

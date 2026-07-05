@@ -275,3 +275,27 @@ def test_vaa_qrl_solution_helper_returns_solution() -> None:
     solution = vaa_qrl_solution(instance, seed=5, max_iterations=10)
 
     check_feasible(instance, solution)
+
+
+def test_vaa_qrl_optimizes_time_window_objective() -> None:
+    instance = generate_random_instance(
+        seed=88,
+        num_compounds=3,
+        num_outbounds=5,
+        num_doors=4,
+        num_products=3,
+        tw_tightness="tight",
+    )
+    initial = vaa_solution(instance)
+    initial_result = evaluate_solution(instance, initial)
+    initial_objective = initial_result.makespan + initial_result.total_tardiness
+
+    run = run_vaa_qrl(
+        instance,
+        VaaQRLConfig(max_iterations=100, seed=1, tardiness_weight=1.0),
+        initial_solution=initial,
+    )
+    check_feasible(instance, run.solution)
+    run_objective = run.result.makespan + run.result.total_tardiness
+
+    assert run_objective <= initial_objective + 1e-9

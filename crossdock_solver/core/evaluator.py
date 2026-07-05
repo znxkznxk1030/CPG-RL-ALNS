@@ -34,6 +34,7 @@ class ScheduleResult:
     waiting_time: dict[TruckId, float]
     critical_door: DoorId
     critical_truck: TruckId
+    total_tardiness: float = 0.0
     critical_path: list[str] = field(default_factory=list)
     precedence_graph: Any | None = None
     metadata: dict[str, Any] = field(default_factory=dict)
@@ -68,8 +69,9 @@ def evaluate_solution(
     for compound in instance.compound_trucks:
         destination, door = solution.compound_assignment[compound]
         unload_time = _compound_unload_time(instance, compound, retained_destination=destination)
-        truck_start[compound] = 0.0
-        compound_unload_finish[compound] = instance.enter_time[compound] + unload_time
+        release = instance.release_time[compound]
+        truck_start[compound] = release
+        compound_unload_finish[compound] = release + instance.enter_time[compound] + unload_time
         door_load[door] += instance.enter_time[compound] + unload_time
 
     carrier_by_destination = solution.destination_carriers()
@@ -139,7 +141,11 @@ def evaluate_solution(
                 raise AssertionError("feasibility checker should reject mismatched door sequences")
 
             load_time = _outbound_load_time(instance, destination)
-            start = max(previous_finish, destination_ready[destination])
+            start = max(
+                previous_finish,
+                destination_ready[destination],
+                instance.release_time[outbound],
+            )
             finish = start + instance.enter_time[outbound] + load_time + instance.leave_time[outbound]
 
             truck_start[outbound] = start
@@ -152,6 +158,11 @@ def evaluate_solution(
         door_finish[door] = previous_finish
 
     makespan = max(truck_finish.values(), default=0.0)
+    total_tardiness = sum(
+        max(0.0, finish - instance.due_time[truck])
+        for truck, finish in truck_finish.items()
+        if instance.due_time[truck] != float("inf")
+    )
     door_utilization = {
         door: (door_load[door] / makespan if makespan > 0 else 0.0)
         for door in instance.doors
@@ -172,6 +183,7 @@ def evaluate_solution(
         waiting_time=waiting_time,
         critical_door=critical_door,
         critical_truck=critical_truck,
+        total_tardiness=total_tardiness,
         critical_path=critical_path,
         precedence_graph=None,
         metadata={

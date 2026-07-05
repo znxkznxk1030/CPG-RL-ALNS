@@ -10,6 +10,12 @@ from crossdock_solver.data.instance import CrossDockInstance
 
 FLOW_PATTERNS = ("uniform", "skewed", "clustered")
 
+TW_TIGHTNESS: dict[str, tuple[float, float]] = {
+    "loose": (0.10, 1.00),
+    "medium": (0.25, 0.60),
+    "tight": (0.50, 0.35),
+}
+
 
 @dataclass(frozen=True)
 class InstanceShape:
@@ -37,6 +43,7 @@ def generate_random_instance(
     flow_low: int = 0,
     flow_high: int = 20,
     flow_pattern: str = "uniform",
+    tw_tightness: str | None = None,
 ) -> CrossDockInstance:
     """Generate a random MVP-compatible instance.
 
@@ -48,12 +55,21 @@ def generate_random_instance(
     - `skewed`: heavy-tailed destination weights; few destinations carry most flow.
     - `clustered`: destinations are grouped per compound; each compound ships
       mostly to its home cluster.
+
+    Time windows: `tw_tightness` in {loose, medium, tight} draws truck release
+    times in [0, rho * H] and sets due times to release + delta * H, where H is
+    an unconstrained-makespan estimate. `None` keeps the classic unconstrained
+    instance (release 0, due infinity).
     """
 
     if num_doors < num_compounds:
         raise ValueError("num_doors must be at least num_compounds")
     if flow_pattern not in FLOW_PATTERNS:
         raise ValueError(f"flow_pattern must be one of {FLOW_PATTERNS}, got {flow_pattern!r}")
+    if tw_tightness is not None and tw_tightness not in TW_TIGHTNESS:
+        raise ValueError(
+            f"tw_tightness must be one of {tuple(TW_TIGHTNESS)} or None, got {tw_tightness!r}"
+        )
 
     rng = random.Random(seed)
     np_rng = np.random.default_rng(seed)
@@ -85,6 +101,20 @@ def generate_random_instance(
     enter_time = {truck: float(rng.randint(1, 5)) for truck in all_trucks}
     leave_time = {truck: float(rng.randint(1, 5)) for truck in all_trucks}
 
+    release_time = None
+    due_time = None
+    if tw_tightness is not None:
+        release_ratio, width_ratio = TW_TIGHTNESS[tw_tightness]
+        horizon = _makespan_estimate(flow, product_time, num_doors)
+        release_time = {
+            truck: round(rng.uniform(0.0, release_ratio * horizon), 1)
+            for truck in all_trucks
+        }
+        due_time = {
+            truck: round(release_time[truck] + width_ratio * horizon, 1)
+            for truck in all_trucks
+        }
+
     return CrossDockInstance(
         compound_trucks=compound_trucks,
         outbound_trucks=outbound_trucks,
@@ -96,6 +126,8 @@ def generate_random_instance(
         travel_time=travel_time,
         enter_time=enter_time,
         leave_time=leave_time,
+        release_time=release_time,
+        due_time=due_time,
     )
 
 
@@ -104,8 +136,9 @@ def generate_benchmark_instance(
     flow_pattern: str = "uniform",
     *,
     seed: int,
+    tw_tightness: str | None = None,
 ) -> CrossDockInstance:
-    """Generate one instance of a named benchmark cell (size class x flow pattern)."""
+    """Generate one instance of a named benchmark cell."""
 
     if size_class not in SIZE_CLASSES:
         raise ValueError(f"size_class must be one of {tuple(SIZE_CLASSES)}, got {size_class!r}")
@@ -117,7 +150,15 @@ def generate_benchmark_instance(
         num_products=shape.num_products,
         seed=seed,
         flow_pattern=flow_pattern,
+        tw_tightness=tw_tightness,
     )
+
+
+def _makespan_estimate(flow: np.ndarray, product_time: np.ndarray, num_doors: int) -> float:
+    """Rough unconstrained makespan scale: total unload+load work spread over doors."""
+
+    total_handling = float((flow @ product_time).sum())
+    return max(1.0, 2.0 * total_handling / num_doors)
 
 
 def _generate_flow(

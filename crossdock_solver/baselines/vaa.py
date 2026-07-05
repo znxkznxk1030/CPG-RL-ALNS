@@ -405,7 +405,8 @@ def _compound_finish(
 ) -> float:
     destination, target_door = solution.compound_assignment[compound]
     own_unload_finish = (
-        instance.enter_time[compound]
+        instance.release_time[compound]
+        + instance.enter_time[compound]
         + _compound_unload_time(instance, compound, destination)
     )
     destination_ready = _destination_ready_at_door(instance, solution, destination, target_door, carrier=compound)
@@ -428,7 +429,7 @@ def _outbound_finish_on_door(
     destination = solution.outbound_assignment[outbound][0]
     destination_ready = _destination_ready_at_door(instance, solution, destination, door, carrier=outbound)
     load_time = _destination_load(instance, destination)
-    start = max(previous_finish, destination_ready)
+    start = max(previous_finish, destination_ready, instance.release_time[outbound])
     return start + instance.enter_time[outbound] + load_time + instance.leave_time[outbound]
 
 
@@ -449,7 +450,8 @@ def _destination_ready_at_door(
         source_door = solution.compound_assignment[source][1]
         retained_destination = solution.compound_assignment[source][0]
         source_unload_finish = (
-            instance.enter_time[source]
+            instance.release_time[source]
+            + instance.enter_time[source]
             + _compound_unload_time(instance, source, retained_destination)
         )
         ready = max(ready, source_unload_finish + instance.travel(source_door, target_door))

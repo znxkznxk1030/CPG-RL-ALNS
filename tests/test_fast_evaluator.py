@@ -18,6 +18,10 @@ def _assert_equivalent(instance, solution, fast: FastEvaluator) -> None:
     fast_result = fast.evaluate(solution)
 
     assert fast_result.makespan == pytest.approx(slow.makespan, abs=1e-9)
+    assert fast_result.total_tardiness == pytest.approx(slow.total_tardiness, abs=1e-9)
+    assert fast_result.objective == pytest.approx(
+        slow.makespan + fast.tardiness_weight * slow.total_tardiness, abs=1e-9
+    )
     assert slow.truck_finish[fast_result.critical_truck] == pytest.approx(
         slow.makespan, abs=1e-9
     )
@@ -50,15 +54,43 @@ def test_fast_evaluator_fuzz_against_reference() -> None:
     operators = tuple(NEIGHBORHOODS.values())
 
     for shape_seed, shape in enumerate(shapes):
-        instance = generate_random_instance(seed=1000 + shape_seed, **shape)
-        fast = FastEvaluator(instance)
-        rng = random.Random(2000 + shape_seed)
+        for tightness in (None, "medium", "tight"):
+            instance = generate_random_instance(
+                seed=1000 + shape_seed, tw_tightness=tightness, **shape
+            )
+            fast = FastEvaluator(instance, tardiness_weight=0.5)
+            rng = random.Random(2000 + shape_seed)
 
-        for _ in range(5):
-            solution = random_feasible_solution(instance, rng)
-            _assert_equivalent(instance, solution, fast)
-
-            for _ in range(20):
-                operator = rng.choice(operators)
-                solution = operator(instance, solution, rng)
+            for _ in range(5):
+                solution = random_feasible_solution(instance, rng)
                 _assert_equivalent(instance, solution, fast)
+
+                for _ in range(20):
+                    operator = rng.choice(operators)
+                    solution = operator(instance, solution, rng)
+                    _assert_equivalent(instance, solution, fast)
+
+
+def test_time_windows_delay_starts_and_create_tardiness() -> None:
+    shape = dict(num_compounds=3, num_outbounds=5, num_doors=4, num_products=3)
+    base = generate_random_instance(seed=77, **shape)
+    windowed = generate_random_instance(seed=77, tw_tightness="tight", **shape)
+
+    solution = vaa_solution(base)
+    base_result = evaluate_solution(base, solution)
+    windowed_result = evaluate_solution(windowed, solution)
+
+    assert windowed_result.makespan >= base_result.makespan
+    assert windowed_result.total_tardiness >= 0.0
+    assert base_result.total_tardiness == 0.0
+
+
+def test_unconstrained_instance_keeps_previous_results() -> None:
+    instance = generate_random_instance(
+        seed=301, num_compounds=4, num_outbounds=6, num_doors=5, num_products=3
+    )
+    solution = vaa_solution(instance)
+    result = evaluate_solution(instance, solution)
+
+    assert result.total_tardiness == 0.0
+    assert result.truck_start[instance.compound_trucks[0]] == 0.0
