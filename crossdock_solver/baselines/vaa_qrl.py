@@ -8,9 +8,15 @@ from typing import Iterator
 from crossdock_solver.alns.acceptance import accept_by_sa
 from crossdock_solver.baselines.paper_sa_rl import (
     NEIGHBORHOODS,
-    _select_action,
     _state_from_no_improvement,
 )
+from crossdock_solver.rl.features import (
+    OperatorSuccessTracker,
+    SearchState,
+    build_feature_vector,
+    instance_features,
+)
+from crossdock_solver.rl.selectors import SelectionContext, TabularQSelector
 from crossdock_solver.baselines.random_baseline import BaselineRun
 from crossdock_solver.baselines.vaa import vaa_solution
 from crossdock_solver.core.evaluator import evaluate_solution
@@ -20,6 +26,17 @@ from crossdock_solver.data.instance import CrossDockInstance, DestinationId, Doo
 
 
 EPSILON = 1e-9
+
+GUIDED_ACTIONS = (
+    "g1_critical_outbound_relocate",
+    "g2_critical_destination_swap",
+)
+TW_GUIDED_ACTIONS = (
+    "g3_tardy_truck_relocate",
+    "g4_tardy_destination_swap",
+)
+ACTIONS = (*NEIGHBORHOODS, *GUIDED_ACTIONS)
+ACTIONS_TW = (*ACTIONS, *TW_GUIDED_ACTIONS)
 
 
 @dataclass
@@ -55,13 +72,16 @@ def run_vaa_qrl(
     config: VaaQRLConfig | None = None,
     *,
     initial_solution: Solution | None = None,
+    selector=None,
 ) -> BaselineRun:
     """Run the VAA + Q-learning guided iterated local search model.
 
     Structure:
     1. VAA constructive initial solution, polished by best-improvement descent.
-    2. Q-learning over no-improvement states selects a move operator among the
-       paper neighborhoods plus critical-door guided operators.
+    2. A selector policy picks a move operator among the paper neighborhoods
+       plus critical-door guided operators. The default is the paper-style
+       tabular Q-learning over no-improvement states; alternative selectors
+       (uniform random, pretrained DQN) plug in via `selector`.
     3. SA acceptance with restart-from-best and reheating on stagnation.
     4. Every new best solution is polished by the same descent.
     """
@@ -91,34 +111,68 @@ def run_vaa_qrl(
     def _guided_destination_swap(inst, solution, move_rng):
         return _critical_destination_swap(inst, solution, move_rng, fast)
 
+    def _guided_tardy_relocate(inst, solution, move_rng):
+        return _tardy_truck_relocate(inst, solution, move_rng, fast)
+
+    def _guided_tardy_destination_swap(inst, solution, move_rng):
+        return _tardy_destination_swap(inst, solution, move_rng, fast)
+
     guided: dict[str, object] = {
         "g1_critical_outbound_relocate": _guided_relocate,
         "g2_critical_destination_swap": _guided_destination_swap,
+        "g3_tardy_truck_relocate": _guided_tardy_relocate,
+        "g4_tardy_destination_swap": _guided_tardy_destination_swap,
     }
-    actions = (*NEIGHBORHOODS, *guided)
-    q_values = {
-        (state, action): 0.0
-        for state in range(1, 6)
-        for action in actions
-    }
+    actions = (
+        tuple(selector.actions) if selector is not None and hasattr(selector, "actions")
+        else ACTIONS
+    )
+    if selector is None:
+        selector = TabularQSelector(
+            actions,
+            learning_rate=config.learning_rate,
+            discount_factor=config.discount_factor,
+            random_prob=config.random_selection_prob,
+            roulette_prob=config.roulette_selection_prob,
+        )
+    needs_features = getattr(selector, "needs_features", False)
+    if needs_features:
+        static_features = instance_features(instance)
+        tracker = OperatorSuccessTracker(actions)
+    initial_temperature = temperature
     no_improvement_count = 0
     since_best = 0
 
-    for _ in range(config.max_iterations):
+    def _context(iteration: int, state_bin: int) -> SelectionContext:
+        if not needs_features:
+            return SelectionContext(state_bin=state_bin)
+        search_state = SearchState(
+            iteration=iteration,
+            max_iterations=config.max_iterations,
+            temperature=temperature,
+            initial_temperature=initial_temperature,
+            current=current_result,
+            best=best_result,
+            no_improvement=no_improvement_count,
+            no_improvement_cap=config.thresholds[-1],
+            since_best=since_best,
+            restart_after=config.restart_after,
+            num_trucks=len(instance.all_trucks),
+        )
+        return SelectionContext(
+            state_bin=state_bin,
+            features=build_feature_vector(static_features, search_state, tracker),
+        )
+
+    for iteration in range(config.max_iterations):
         if (
             config.time_budget_sec is not None
             and time.perf_counter() - start_time >= config.time_budget_sec
         ):
             break
         state = _state_from_no_improvement(no_improvement_count, config.thresholds)
-        action = _select_action(
-            state,
-            actions,
-            q_values,
-            rng,
-            random_prob=config.random_selection_prob,
-            roulette_prob=config.roulette_selection_prob,
-        )
+        context = _context(iteration, state)
+        action = selector.select(context, rng)
 
         operator = NEIGHBORHOODS.get(action) or guided[action]
         candidate = operator(instance, current, rng)
@@ -140,11 +194,6 @@ def run_vaa_qrl(
             0 if candidate_result.objective <= current_result.objective + EPSILON else no_improvement_count + 1
         )
         next_state = _state_from_no_improvement(next_no_improvement, config.thresholds)
-        q_values[(state, action)] += config.learning_rate * (
-            reward
-            + config.discount_factor * max(q_values[(next_state, next_action)] for next_action in actions)
-            - q_values[(state, action)]
-        )
 
         if accept_by_sa(current_result.objective, candidate_result.objective, temperature, rng):
             current = candidate
@@ -162,6 +211,10 @@ def run_vaa_qrl(
             temperature = max(temperature, config.reheat_ratio * best_result.objective)
             since_best = 0
             no_improvement_count = 0
+
+        if needs_features:
+            tracker.update(action, reward > 0.0)
+        selector.observe(context, action, reward, _context(iteration + 1, next_state))
 
     best, _ = _descent(instance, best, best_result, fast, deadline)
 
@@ -334,6 +387,88 @@ def _critical_destination_swap(
         if other == critical:
             continue
         candidate = _destinations_swapped(solution, critical, other)
+        candidate_objective = fast.evaluate(candidate).objective
+        if candidate_objective < best_objective - EPSILON:
+            best = candidate
+            best_objective = candidate_objective
+    return best
+
+
+def _compound_door_moves(
+    instance: CrossDockInstance,
+    solution: Solution,
+    compound: TruckId,
+) -> Iterator[Solution]:
+    """Door swaps with other compounds plus moves to free doors, for one compound."""
+
+    for other in instance.compound_trucks:
+        if other != compound:
+            yield _compound_doors_swapped(solution, compound, other)
+
+    occupied = {door for _, door in solution.compound_assignment.values()}
+    destination, _ = solution.compound_assignment[compound]
+    for door in instance.doors:
+        if door in occupied:
+            continue
+        candidate = solution.copy()
+        candidate.compound_assignment[compound] = (destination, door)
+        yield candidate
+
+
+def _tardy_truck_relocate(
+    instance: CrossDockInstance,
+    solution: Solution,
+    rng: random.Random,
+    fast: FastEvaluator,
+) -> Solution:
+    """Best relocation of the most tardy truck (time-window guided operator).
+
+    Falls back to the critical-door relocate when no truck is late, so the
+    operator stays meaningful on instances without time windows.
+    """
+
+    result = fast.evaluate(solution)
+    truck = result.most_tardy_truck
+    if truck is None:
+        return _critical_outbound_relocate(instance, solution, rng, fast)
+
+    if truck in solution.compound_assignment:
+        moves = _compound_door_moves(instance, solution, truck)
+    else:
+        moves = _relocations(instance, solution, truck)
+
+    best = solution.copy()
+    best_objective = result.objective
+    for candidate in moves:
+        candidate_objective = fast.evaluate(candidate).objective
+        if candidate_objective < best_objective - EPSILON:
+            best = candidate
+            best_objective = candidate_objective
+    return best
+
+
+def _tardy_destination_swap(
+    instance: CrossDockInstance,
+    solution: Solution,
+    rng: random.Random,
+    fast: FastEvaluator,
+) -> Solution:
+    """Best destination swap anchored on the most tardy truck.
+
+    Falls back to the critical-truck destination swap when no truck is late.
+    """
+
+    result = fast.evaluate(solution)
+    anchor = result.most_tardy_truck
+    if anchor is None:
+        return _critical_destination_swap(instance, solution, rng, fast)
+
+    best = solution.copy()
+    best_objective = result.objective
+    for other in instance.all_trucks:
+        if other == anchor:
+            continue
+        candidate = _destinations_swapped(solution, anchor, other)
         candidate_objective = fast.evaluate(candidate).objective
         if candidate_objective < best_objective - EPSILON:
             best = candidate

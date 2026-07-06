@@ -8,13 +8,21 @@ from crossdock_solver.data.instance import CrossDockInstance, DoorId, TruckId
 
 @dataclass(frozen=True)
 class FastResult:
-    """Minimal schedule summary for search hot paths."""
+    """Minimal schedule summary for search hot paths.
+
+    `door_finish` follows `instance.doors` order; `tardy_count` is the number
+    of trucks finishing after their due time. Both feed the search-state
+    features of the transferable policy.
+    """
 
     makespan: float
     critical_door: DoorId
     critical_truck: TruckId
     total_tardiness: float = 0.0
     objective: float = 0.0
+    door_finish: tuple[float, ...] = ()
+    tardy_count: int = 0
+    most_tardy_truck: TruckId | None = None
 
 
 class FastEvaluator:
@@ -117,6 +125,9 @@ class FastEvaluator:
 
         best_makespan = 0.0
         total_tardiness = 0.0
+        tardy_count = 0
+        worst_tardiness = 0.0
+        most_tardy_truck: TruckId | None = None
         due = self._due
         critical_truck: TruckId = instance.all_trucks[0]
         door_finish = [0.0] * len(instance.doors)
@@ -139,7 +150,12 @@ class FastEvaluator:
                 critical_truck = truck
             truck_due = due.get(truck)
             if truck_due is not None and finish > truck_due:
-                total_tardiness += finish - truck_due
+                tardiness = finish - truck_due
+                total_tardiness += tardiness
+                tardy_count += 1
+                if tardiness > worst_tardiness:
+                    worst_tardiness = tardiness
+                    most_tardy_truck = truck
 
         for door, sequence in solution.door_sequences.items():
             m = door_idx[door]
@@ -157,7 +173,12 @@ class FastEvaluator:
                     critical_truck = truck
                 truck_due = due.get(truck)
                 if truck_due is not None and finish > truck_due:
-                    total_tardiness += finish - truck_due
+                    tardiness = finish - truck_due
+                    total_tardiness += tardiness
+                    tardy_count += 1
+                    if tardiness > worst_tardiness:
+                        worst_tardiness = tardiness
+                        most_tardy_truck = truck
             door_finish[m] = previous
 
         critical_door = instance.doors[max(range(len(door_finish)), key=door_finish.__getitem__)]
@@ -167,4 +188,7 @@ class FastEvaluator:
             critical_truck=critical_truck,
             total_tardiness=total_tardiness,
             objective=best_makespan + self.tardiness_weight * total_tardiness,
+            door_finish=tuple(door_finish),
+            tardy_count=tardy_count,
+            most_tardy_truck=most_tardy_truck,
         )

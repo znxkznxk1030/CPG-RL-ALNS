@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import importlib.machinery
 import sys
 import time
 import types
@@ -32,6 +33,10 @@ def _ensure_pandas_importable() -> None:
     class _Any:
         pass
 
+    # Only the attributes cp_model touches at import time, plus a version
+    # string because third-party libraries probe `pandas.__version__` whenever
+    # "pandas" appears in sys.modules. Unknown attributes raise AttributeError
+    # so those probes fail loudly-but-catchably instead of receiving a class.
     for name in ("pandas", "pyarrow"):
         if getattr(sys.modules.get(name), _STUB_MARK, False):
             continue
@@ -40,7 +45,8 @@ def _ensure_pandas_importable() -> None:
         stub.Index = _Any
         stub.Series = _Any
         stub.DataFrame = _Any
-        stub.__getattr__ = lambda _name: _Any  # type: ignore[attr-defined]
+        stub.__version__ = "0.0.0+crossdock-stub"
+        stub.__spec__ = importlib.machinery.ModuleSpec(name, loader=None)
         sys.modules[name] = stub
 
 
@@ -89,6 +95,8 @@ class ExactCPSATResult:
 def solve_exact_cpsat(
     instance: CrossDockInstance,
     config: ExactCPSATConfig | None = None,
+    *,
+    fixed_solution: Solution | None = None,
 ) -> ExactCPSATResult:
     """Solve the MVP scheduling model exactly with OR-Tools CP-SAT.
 
@@ -96,6 +104,11 @@ def solve_exact_cpsat(
     timing semantics as the evaluator) but replaces big-M disjunctions with
     reified constraints, which propagate tighter lower bounds. All time
     quantities are scaled to integers by `TIME_SCALE`.
+
+    If `fixed_solution` is given, the compound/outbound assignment is pinned to
+    it and only the schedule timing is optimized. The resulting makespan must
+    equal the evaluator's for that assignment when the model is faithful; this
+    is used to validate model fidelity independently of proving optimality.
     """
 
     config = config or ExactCPSATConfig()
@@ -157,6 +170,18 @@ def solve_exact_cpsat(
     os = {o: model.NewIntVar(0, horizon, f"os_{o}") for o in outbounds}
     of = {o: model.NewIntVar(0, horizon, f"of_{o}") for o in outbounds}
     cmax = model.NewIntVar(0, horizon, "cmax")
+
+    if fixed_solution is not None:
+        for c in compounds:
+            fd, fm = fixed_solution.compound_assignment[c]
+            for d in destinations:
+                for m in doors:
+                    model.Add(x[(c, d, m)] == (1 if (d == fd and m == fm) else 0))
+        for o in outbounds:
+            fd, fm = fixed_solution.outbound_assignment[o]
+            for d in destinations:
+                for m in doors:
+                    model.Add(z[(o, d, m)] == (1 if (d == fd and m == fm) else 0))
 
     # Assignment structure -----------------------------------------------------
     for c in compounds:
@@ -287,6 +312,11 @@ def solve_exact_cpsat(
 
     solution = _extract_solution(instance, solver, x, z, os)
     result = evaluate_solution(instance, solution)
+    # Report the incumbent objective from the evaluator, not solver.ObjectiveValue().
+    # On a timeout the incumbent's auxiliary timing variables need not be minimized,
+    # so solver.ObjectiveValue() can overstate the assignment's true cost; the
+    # evaluator recomputes the earliest feasible schedule for the same assignment.
+    incumbent_objective = result.makespan + config.tardiness_weight * result.total_tardiness
     return ExactCPSATResult(
         run=BaselineRun(
             name=config.name,
@@ -297,7 +327,7 @@ def solve_exact_cpsat(
         ),
         status=status,
         proven_optimal=proven_optimal,
-        objective_value=solver.ObjectiveValue() / divisor,
+        objective_value=incumbent_objective,
         lower_bound=solver.BestObjectiveBound() / divisor,
         runtime_sec=runtime_sec,
     )

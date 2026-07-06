@@ -69,3 +69,43 @@ def test_cpsat_lower_bound_never_exceeds_incumbent() -> None:
 
     assert result.run is not None
     assert result.lower_bound <= result.objective_value + 1e-6
+
+
+def test_cpsat_model_is_faithful_to_evaluator() -> None:
+    # For a fixed assignment the model's minimum makespan must equal the
+    # evaluator's; otherwise the CP-SAT lower bound would not be a valid bound
+    # on the true (evaluator) optimum. Checked on several random assignments.
+    import random
+
+    from crossdock_solver.core.evaluator import evaluate_solution
+    from crossdock_solver.initial.random_init import random_feasible_solution
+
+    instance = generate_random_instance(
+        seed=3, num_compounds=4, num_outbounds=5, num_doors=5, num_products=3
+    )
+    rng = random.Random(0)
+    for _ in range(4):
+        solution = random_feasible_solution(instance, rng)
+        evaluator_makespan = evaluate_solution(instance, solution).makespan
+        result = solve_exact_cpsat(
+            instance, ExactCPSATConfig(time_limit_sec=30), fixed_solution=solution
+        )
+        assert result.proven_optimal
+        assert result.objective_value == pytest.approx(evaluator_makespan, abs=1e-4)
+
+
+def test_cpsat_incumbent_objective_matches_evaluator_on_timeout() -> None:
+    # Even when optimality is not proven, the reported incumbent objective is the
+    # evaluator's value for the extracted assignment (not solver.ObjectiveValue).
+    from crossdock_solver.core.evaluator import evaluate_solution
+
+    instance = generate_random_instance(
+        seed=0, num_compounds=6, num_outbounds=6, num_doors=6, num_products=3
+    )
+    result = solve_exact_cpsat(instance, ExactCPSATConfig(time_limit_sec=8))
+
+    assert result.run is not None
+    assert result.objective_value == pytest.approx(
+        evaluate_solution(instance, result.run.solution).makespan, abs=1e-6
+    )
+    assert result.lower_bound <= result.objective_value + 1e-6
