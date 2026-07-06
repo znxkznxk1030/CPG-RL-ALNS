@@ -20,6 +20,64 @@ def combinatorial_lower_bound(instance: CrossDockInstance) -> float:
     )
 
 
+def combinatorial_objective_lower_bound(
+    instance: CrossDockInstance, tardiness_weight: float
+) -> float:
+    """Valid lower bound on makespan + weight * total tardiness.
+
+    For any feasible solution, makespan >= the makespan bound and total
+    tardiness >= the structural tardiness bound (each truck finishes no earlier
+    than its fastest possible chain), so their weighted sum bounds the
+    objective.
+    """
+
+    return combinatorial_lower_bound(instance) + tardiness_weight * _tardiness_bound(
+        instance
+    )
+
+
+def _earliest_finish(instance: CrossDockInstance, truck) -> float:
+    """Earliest possible finish of a truck, relaxing all door contention."""
+
+    compounds = instance.compound_trucks
+    destinations = instance.destinations
+    if truck in instance.compound_index:
+        total_handling = sum(instance.handling_time(truck, d) for d in destinations)
+        chain = min(
+            total_handling
+            - instance.handling_time(truck, d)
+            + sum(
+                instance.handling_time(source, d)
+                for source in compounds
+                if source != truck
+            )
+            for d in destinations
+        )
+    else:
+        chain = min(
+            sum(instance.handling_time(source, d) for source in compounds)
+            for d in destinations
+        )
+    return (
+        instance.release_time[truck]
+        + instance.enter_time[truck]
+        + chain
+        + instance.leave_time[truck]
+    )
+
+
+def _tardiness_bound(instance: CrossDockInstance) -> float:
+    """Structural lower bound on total tardiness (per-truck earliest finish)."""
+
+    total = 0.0
+    for truck in instance.all_trucks:
+        due = instance.due_time[truck]
+        if due == float("inf"):
+            continue
+        total += max(0.0, _earliest_finish(instance, truck) - due)
+    return total
+
+
 def _critical_truck_bound(instance: CrossDockInstance) -> float:
     """Longest unavoidable single-truck chain.
 
