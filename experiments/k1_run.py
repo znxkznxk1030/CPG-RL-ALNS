@@ -54,6 +54,32 @@ def search_jobs() -> list[Job]:
     return jobs
 
 
+def budget_jobs() -> list[Job]:
+    """Budget-sensitivity sweep: selector x iteration budget (50/200/3000).
+
+    The 1000-iteration points come from the main search batch.
+    """
+
+    jobs: list[Job] = []
+    for size in SIZES:
+        for tw in TW_LEVELS:
+            for index in INDICES:
+                common = dict(
+                    pool="test",
+                    size_class=size,
+                    flow_pattern="uniform",
+                    tw_tightness=tw,
+                    index=index,
+                )
+                for budget in (50, 200, 3000):
+                    for selector in ("", "uniform-", "dqn-"):
+                        for rep in REPS:
+                            jobs.append(
+                                Job(method=f"GILS-{selector}{budget}", rep=rep, **common)
+                            )
+    return jobs
+
+
 def cpsat_jobs() -> list[Job]:
     jobs: list[Job] = []
     for tw in TW_LEVELS:
@@ -89,10 +115,12 @@ def main() -> None:
     batch = sys.argv[1] if len(sys.argv) > 1 else "search"
     if batch == "search":
         executed = run_jobs(search_jobs(), OUTPUT, workers=6)
+    elif batch == "budget":
+        executed = run_jobs(budget_jobs(), OUTPUT, workers=6)
     elif batch == "cpsat":
         executed = run_jobs(cpsat_jobs(), OUTPUT, workers=2)
     else:
-        raise SystemExit(f"unknown batch {batch!r} (use: search | cpsat)")
+        raise SystemExit(f"unknown batch {batch!r} (use: search | budget | cpsat)")
     print(f"{batch}: executed {executed} new jobs -> {OUTPUT}")
 
 

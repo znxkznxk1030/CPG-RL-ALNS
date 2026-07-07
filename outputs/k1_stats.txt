@@ -1,0 +1,19 @@
+=== Wilcoxon signed-rank (two-sided), objective ===
+comparison                                    n mean diff%   p-value       verdict
+GILS-1000 vs VAA                    45     +2.390    0.0000   significant
+GILS-1000 vs Paper-SA-RL5-1000      75     +1.157    0.0000   significant
+GILS-1000 vs GILS-uniform-1000     204     -0.000    0.2771 no difference
+GILS-1000 vs GILS-dqn-1000         203     +0.143    0.0000   significant
+GILS-uniform-1000 vs GILS-dqn-1000         185     +0.144    0.0000   significant
+
+=== Budget sensitivity: mean gap% to per-instance best-known ===
+selector          50       200      1000      3000
+uniform         0.47      0.38      0.23      0.16
+tabular         0.56      0.46      0.23      0.09
+dqn             0.56      0.51      0.38      0.26
+
+=== Budget sensitivity: selector spread per budget (max-min of the three) ===
+budget    50: spread 0.088%p
+budget   200: spread 0.134%p
+budget  1000: spread 0.144%p
+budget  3000: spread 0.166%p

@@ -38,6 +38,7 @@ class PaperSARLConfig:
     roulette_selection_prob: float = 0.20
     initial_temperature: float | None = None
     cooling_rate: float = 0.995
+    tardiness_weight: float = 0.0
     seed: int | None = None
     name: str = "Paper-SA-RL5"
 

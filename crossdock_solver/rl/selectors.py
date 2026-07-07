@@ -15,6 +15,7 @@ a selector. Three families are provided:
 from __future__ import annotations
 
 from dataclasses import dataclass
+import math
 import random
 
 import numpy as np
@@ -99,6 +100,61 @@ class TabularQSelector:
             * max(self.q_values[(next_state, a)] for a in self.actions)
             - self.q_values[(state, action)]
         )
+
+
+class UCBSelector:
+    """UCB1 bandit over operators; reward = success indicator (reward > 0)."""
+
+    needs_features = False
+
+    def __init__(self, actions: tuple[str, ...], *, exploration: float = 1.0) -> None:
+        self.actions = actions
+        self.exploration = exploration
+        self.counts = {action: 0 for action in actions}
+        self.successes = {action: 0.0 for action in actions}
+        self.step = 0
+
+    def select(self, context: SelectionContext, rng: random.Random) -> str:
+        self.step += 1
+        untried = [a for a in self.actions if self.counts[a] == 0]
+        if untried:
+            return rng.choice(untried)
+        log_t = math.log(self.step)
+        return max(
+            self.actions,
+            key=lambda a: self.successes[a] / self.counts[a]
+            + self.exploration * math.sqrt(2.0 * log_t / self.counts[a]),
+        )
+
+    def observe(self, context, action: str, reward: float, next_context) -> None:
+        self.counts[action] += 1
+        if reward > 0.0:
+            self.successes[action] += 1.0
+
+
+class ThompsonSelector:
+    """Bernoulli Thompson sampling over operators (Beta(1+s, 1+f) posteriors)."""
+
+    needs_features = False
+
+    def __init__(self, actions: tuple[str, ...]) -> None:
+        self.actions = actions
+        self.successes = {action: 0 for action in actions}
+        self.failures = {action: 0 for action in actions}
+
+    def select(self, context: SelectionContext, rng: random.Random) -> str:
+        return max(
+            self.actions,
+            key=lambda a: rng.betavariate(
+                1 + self.successes[a], 1 + self.failures[a]
+            ),
+        )
+
+    def observe(self, context, action: str, reward: float, next_context) -> None:
+        if reward > 0.0:
+            self.successes[action] += 1
+        else:
+            self.failures[action] += 1
 
 
 class DQNSelector:

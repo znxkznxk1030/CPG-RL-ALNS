@@ -90,8 +90,27 @@ matches an exact solver where learning adds nothing."
 
 ## To do before submission
 
-- [ ] CP-SAT batch complete -> final Table 1 numbers
-- [ ] Wilcoxon tests for ablation table
-- [ ] Budget sensitivity mini-experiment (iterations 50/200/1000)
+- [x] CP-SAT batch complete -> final Table 1 numbers (outputs/k1_results.jsonl,
+      experiments/k1_summary.py)
+- [x] Wilcoxon tests (experiments/k1_stats.py -> outputs/k1_stats.txt)
+- [x] Budget sensitivity (50/200/1000/3000, same file)
 - [ ] English draft (LaTeX/Word per APIEMS template — check template on site)
 - [ ] Naming: present engine as "VAA-GILS"; tabular-Q variant is one ablation arm
+
+## Key numbers for the results section (test pool, final)
+
+- GILS vs VAA: +2.39% better, p < 1e-4 (n=45 instances).
+- GILS vs Paper-SA-RL5: +1.16% better, p < 1e-4 (n=75 pairs, no-TW cells).
+- GILS within +0.1~0.34% of CP-SAT incumbents wherever CP-SAT produces one
+  (S all TW levels at 300s, M-none at 600s), at <1s vs 300-600s.
+- Selector ablation (the nuanced negative result):
+  - tabular vs uniform: direction flips with budget (uniform better by 0.08%
+    at 50 iters; equal at 1000, p=0.28; tabular better by 0.07% at 3000) —
+    magnitudes ~0.1%p, an order below method differences.
+  - transfer DQN never wins at any budget; significantly worse than both
+    uniform and tabular at 1000/3000 (+0.14~0.17%p, p < 1e-4).
+  - Claim to write: "operator-selection policies produce statistically
+    detectable but practically negligible effects (<=0.17%p), with no budget
+    regime where the learned policy wins."
+- Budget curve (mean gap to best-known): 50 iters ~0.5% -> 3000 iters ~0.1-0.3%
+  for all selectors — the engine, not the selector, does the work.
