@@ -1,0 +1,718 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>apiems2026_summary_ko.md</title>
+<meta http-equiv="Content-type" content="text/html;charset=UTF-8">
+
+<style>
+/* https://github.com/microsoft/vscode/blob/master/extensions/markdown-language-features/media/markdown.css */
+/*---------------------------------------------------------------------------------------------
+ *  Copyright (c) Microsoft Corporation. All rights reserved.
+ *  Licensed under the MIT License. See License.txt in the project root for license information.
+ *--------------------------------------------------------------------------------------------*/
+
+body {
+	font-family: var(--vscode-markdown-font-family, -apple-system, BlinkMacSystemFont, "Segoe WPC", "Segoe UI", "Ubuntu", "Droid Sans", sans-serif);
+	font-size: var(--vscode-markdown-font-size, 14px);
+	padding: 0 26px;
+	line-height: var(--vscode-markdown-line-height, 22px);
+	word-wrap: break-word;
+}
+
+#code-csp-warning {
+	position: fixed;
+	top: 0;
+	right: 0;
+	color: white;
+	margin: 16px;
+	text-align: center;
+	font-size: 12px;
+	font-family: sans-serif;
+	background-color:#444444;
+	cursor: pointer;
+	padding: 6px;
+	box-shadow: 1px 1px 1px rgba(0,0,0,.25);
+}
+
+#code-csp-warning:hover {
+	text-decoration: none;
+	background-color:#007acc;
+	box-shadow: 2px 2px 2px rgba(0,0,0,.25);
+}
+
+body.scrollBeyondLastLine {
+	margin-bottom: calc(100vh - 22px);
+}
+
+body.showEditorSelection .code-line {
+	position: relative;
+}
+
+body.showEditorSelection .code-active-line:before,
+body.showEditorSelection .code-line:hover:before {
+	content: "";
+	display: block;
+	position: absolute;
+	top: 0;
+	left: -12px;
+	height: 100%;
+}
+
+body.showEditorSelection li.code-active-line:before,
+body.showEditorSelection li.code-line:hover:before {
+	left: -30px;
+}
+
+.vscode-light.showEditorSelection .code-active-line:before {
+	border-left: 3px solid rgba(0, 0, 0, 0.15);
+}
+
+.vscode-light.showEditorSelection .code-line:hover:before {
+	border-left: 3px solid rgba(0, 0, 0, 0.40);
+}
+
+.vscode-light.showEditorSelection .code-line .code-line:hover:before {
+	border-left: none;
+}
+
+.vscode-dark.showEditorSelection .code-active-line:before {
+	border-left: 3px solid rgba(255, 255, 255, 0.4);
+}
+
+.vscode-dark.showEditorSelection .code-line:hover:before {
+	border-left: 3px solid rgba(255, 255, 255, 0.60);
+}
+
+.vscode-dark.showEditorSelection .code-line .code-line:hover:before {
+	border-left: none;
+}
+
+.vscode-high-contrast.showEditorSelection .code-active-line:before {
+	border-left: 3px solid rgba(255, 160, 0, 0.7);
+}
+
+.vscode-high-contrast.showEditorSelection .code-line:hover:before {
+	border-left: 3px solid rgba(255, 160, 0, 1);
+}
+
+.vscode-high-contrast.showEditorSelection .code-line .code-line:hover:before {
+	border-left: none;
+}
+
+img {
+	max-width: 100%;
+	max-height: 100%;
+}
+
+a {
+	text-decoration: none;
+}
+
+a:hover {
+	text-decoration: underline;
+}
+
+a:focus,
+input:focus,
+select:focus,
+textarea:focus {
+	outline: 1px solid -webkit-focus-ring-color;
+	outline-offset: -1px;
+}
+
+hr {
+	border: 0;
+	height: 2px;
+	border-bottom: 2px solid;
+}
+
+h1 {
+	padding-bottom: 0.3em;
+	line-height: 1.2;
+	border-bottom-width: 1px;
+	border-bottom-style: solid;
+}
+
+h1, h2, h3 {
+	font-weight: normal;
+}
+
+table {
+	border-collapse: collapse;
+}
+
+table > thead > tr > th {
+	text-align: left;
+	border-bottom: 1px solid;
+}
+
+table > thead > tr > th,
+table > thead > tr > td,
+table > tbody > tr > th,
+table > tbody > tr > td {
+	padding: 5px 10px;
+}
+
+table > tbody > tr + tr > td {
+	border-top: 1px solid;
+}
+
+blockquote {
+	margin: 0 7px 0 5px;
+	padding: 0 16px 0 10px;
+	border-left-width: 5px;
+	border-left-style: solid;
+}
+
+code {
+	font-family: Menlo, Monaco, Consolas, "Droid Sans Mono", "Courier New", monospace, "Droid Sans Fallback";
+	font-size: 1em;
+	line-height: 1.357em;
+}
+
+body.wordWrap pre {
+	white-space: pre-wrap;
+}
+
+pre:not(.hljs),
+pre.hljs code > div {
+	padding: 16px;
+	border-radius: 3px;
+	overflow: auto;
+}
+
+pre code {
+	color: var(--vscode-editor-foreground);
+	tab-size: 4;
+}
+
+/** Theming */
+
+.vscode-light pre {
+	background-color: rgba(220, 220, 220, 0.4);
+}
+
+.vscode-dark pre {
+	background-color: rgba(10, 10, 10, 0.4);
+}
+
+.vscode-high-contrast pre {
+	background-color: rgb(0, 0, 0);
+}
+
+.vscode-high-contrast h1 {
+	border-color: rgb(0, 0, 0);
+}
+
+.vscode-light table > thead > tr > th {
+	border-color: rgba(0, 0, 0, 0.69);
+}
+
+.vscode-dark table > thead > tr > th {
+	border-color: rgba(255, 255, 255, 0.69);
+}
+
+.vscode-light h1,
+.vscode-light hr,
+.vscode-light table > tbody > tr + tr > td {
+	border-color: rgba(0, 0, 0, 0.18);
+}
+
+.vscode-dark h1,
+.vscode-dark hr,
+.vscode-dark table > tbody > tr + tr > td {
+	border-color: rgba(255, 255, 255, 0.18);
+}
+
+</style>
+
+<style>
+/* Tomorrow Theme */
+/* http://jmblog.github.com/color-themes-for-google-code-highlightjs */
+/* Original theme - https://github.com/chriskempson/tomorrow-theme */
+
+/* Tomorrow Comment */
+.hljs-comment,
+.hljs-quote {
+	color: #8e908c;
+}
+
+/* Tomorrow Red */
+.hljs-variable,
+.hljs-template-variable,
+.hljs-tag,
+.hljs-name,
+.hljs-selector-id,
+.hljs-selector-class,
+.hljs-regexp,
+.hljs-deletion {
+	color: #c82829;
+}
+
+/* Tomorrow Orange */
+.hljs-number,
+.hljs-built_in,
+.hljs-builtin-name,
+.hljs-literal,
+.hljs-type,
+.hljs-params,
+.hljs-meta,
+.hljs-link {
+	color: #f5871f;
+}
+
+/* Tomorrow Yellow */
+.hljs-attribute {
+	color: #eab700;
+}
+
+/* Tomorrow Green */
+.hljs-string,
+.hljs-symbol,
+.hljs-bullet,
+.hljs-addition {
+	color: #718c00;
+}
+
+/* Tomorrow Blue */
+.hljs-title,
+.hljs-section {
+	color: #4271ae;
+}
+
+/* Tomorrow Purple */
+.hljs-keyword,
+.hljs-selector-tag {
+	color: #8959a8;
+}
+
+.hljs {
+	display: block;
+	overflow-x: auto;
+	color: #4d4d4c;
+	padding: 0.5em;
+}
+
+.hljs-emphasis {
+	font-style: italic;
+}
+
+.hljs-strong {
+	font-weight: bold;
+}
+</style>
+
+<style>
+/*
+ * Markdown PDF CSS
+ */
+
+ body {
+	font-family: -apple-system, BlinkMacSystemFont, "Segoe WPC", "Segoe UI", "Ubuntu", "Droid Sans", sans-serif, "Meiryo";
+	padding: 0 12px;
+}
+
+pre {
+	background-color: #f8f8f8;
+	border: 1px solid #cccccc;
+	border-radius: 3px;
+	overflow-x: auto;
+	white-space: pre-wrap;
+	overflow-wrap: break-word;
+}
+
+pre:not(.hljs) {
+	padding: 23px;
+	line-height: 19px;
+}
+
+blockquote {
+	background: rgba(127, 127, 127, 0.1);
+	border-color: rgba(0, 122, 204, 0.5);
+}
+
+.emoji {
+	height: 1.4em;
+}
+
+code {
+	font-size: 14px;
+	line-height: 19px;
+}
+
+/* for inline code */
+:not(pre):not(.hljs) > code {
+	color: #C9AE75; /* Change the old color so it seems less like an error */
+	font-size: inherit;
+}
+
+/* Page Break : use <div class="page"/> to insert page break
+-------------------------------------------------------- */
+.page {
+	page-break-after: always;
+}
+
+</style>
+
+<script src="https://unpkg.com/mermaid/dist/mermaid.min.js"></script>
+</head>
+<body>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: document.body.classList.contains('vscode-dark') || document.body.classList.contains('vscode-high-contrast')
+          ? 'dark'
+          : 'default'
+    });
+  </script>
+<h1 id="vaa-gils-%EC%8B%A4%ED%97%98-%EA%B2%B0%EA%B3%BC-%EC%9A%94%EC%95%BD">VAA-GILS 실험 결과 요약</h1>
+<h2 id="1-%EC%97%B0%EA%B5%AC-%EA%B0%9C%EC%9A%94">1. 연구 개요</h2>
+<p>본 연구는 컴파운드 트럭 부분 하역 크로스도킹 문제에 트럭별 도착 시각과
+소프트 마감을 추가한 Time Window 확장 문제를 다룬다. 기존 모델은 모든 트럭이
+시간 0에 가용하다고 가정하고 makespan만 최소화하지만, 실제 출고 운영에서는
+트럭 도착 시각과 마감 지연을 함께 고려해야 한다.</p>
+<p>제안 방법은 <strong>VAA-GILS</strong>이다. VAA 구성 휴리스틱으로 초기해를 만든 뒤, 현재
+스케줄의 병목을 찾아 집중적으로 개선하는 guided iterated local search 방식이다.</p>
+<h2 id="2-%ED%95%B5%EC%8B%AC-%EA%B8%B0%EC%97%AC">2. 핵심 기여</h2>
+<ul>
+<li><strong>문제 확장:</strong> 컴파운드 트럭 부분 하역 모델에 도착 시각과 소프트 마감을 반영했다.</li>
+<li><strong>방법 제안:</strong> 병목 기반 guided operator, descent, restart를 결합한 VAA-GILS를 제안했다.</li>
+<li><strong>실험 분석:</strong> uniform, tabular Q-learning, DQN 선택기를 비교하여 학습 기반 연산자
+선택의 추가 효과를 검증했다.</li>
+</ul>
+<h2 id="3-%EC%8B%A4%ED%97%98-%EC%A7%88%EB%AC%B8">3. 실험 질문</h2>
+<ol>
+<li>VAA-GILS가 기존 VAA 및 Paper-SA-RL5보다 좋은가?</li>
+<li>CP-SAT가 해를 주는 작은 셀에서 VAA-GILS가 정확해 기준에 얼마나 가까운가?</li>
+<li>연산자 선택을 학습시키는 것이 uniform 선택보다 실질적으로 나은가?</li>
+</ol>
+<h2 id="4-%EC%8B%A4%ED%97%98-%EC%84%A4%EC%A0%95">4. 실험 설정</h2>
+<ul>
+<li>규모: S, M, L</li>
+<li>Time Window: none, medium, tight</li>
+<li>인스턴스: 각 셀당 test 인스턴스 5개</li>
+<li>반복: stochastic method는 인스턴스당 5회</li>
+<li>비교 방법: VAA, Paper-SA-RL5, GILS-uniform, GILS-tabular, GILS-DQN</li>
+<li>정확해 기준: S는 CP-SAT 300초, M/L 일부는 CP-SAT 600초</li>
+</ul>
+<p>CP-SAT가 해를 낸 셀에서는 CP-SAT 대비 gap을 함께 보고한다. CP-SAT가 600초 안에
+가능해를 못 낸 큰 Time Window 셀에서는 best-known 해 대비 gap을 본다.</p>
+<h2 id="5-%EC%A0%84%EC%B2%B4-%EC%8B%A4%ED%97%98-%ED%85%8C%EC%9D%B4%EB%B8%94">5. 전체 실험 테이블</h2>
+<p><code>Δbk</code>는 인스턴스별 best-known 해 대비 평균 gap이다.</p>
+<table>
+<thead>
+<tr>
+<th>셀</th>
+<th>방법</th>
+<th>Mean obj ± std</th>
+<th style="text-align:right">Δbk (%)</th>
+<th style="text-align:right">CP-SAT 대비 (%)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>S-none</td>
+<td>VAA</td>
+<td>1443.3 ± 165.6</td>
+<td style="text-align:right">6.49</td>
+<td style="text-align:right">+6.49</td>
+</tr>
+<tr>
+<td></td>
+<td>Paper-SA-RL5</td>
+<td>1375.9 ± 185.3</td>
+<td style="text-align:right">1.21</td>
+<td style="text-align:right">+1.21</td>
+</tr>
+<tr>
+<td></td>
+<td>GILS-uniform</td>
+<td>1362.5 ± 184.3</td>
+<td style="text-align:right">0.21</td>
+<td style="text-align:right">+0.21</td>
+</tr>
+<tr>
+<td></td>
+<td>GILS-tabular</td>
+<td>1364.1 ± 184.7</td>
+<td style="text-align:right">0.33</td>
+<td style="text-align:right">+0.33</td>
+</tr>
+<tr>
+<td></td>
+<td>GILS-DQN</td>
+<td>1370.0 ± 186.5</td>
+<td style="text-align:right">0.75</td>
+<td style="text-align:right">+0.75</td>
+</tr>
+<tr>
+<td>S-medium</td>
+<td>VAA</td>
+<td>6426.2 ± 1869.2</td>
+<td style="text-align:right">3.33</td>
+<td style="text-align:right">+3.33</td>
+</tr>
+<tr>
+<td></td>
+<td>GILS-uniform</td>
+<td>6227.0 ± 1802.3</td>
+<td style="text-align:right">0.11</td>
+<td style="text-align:right">+0.11</td>
+</tr>
+<tr>
+<td></td>
+<td>GILS-tabular</td>
+<td>6229.5 ± 1798.2</td>
+<td style="text-align:right">0.18</td>
+<td style="text-align:right">+0.18</td>
+</tr>
+<tr>
+<td></td>
+<td>GILS-DQN</td>
+<td>6249.7 ± 1796.4</td>
+<td style="text-align:right">0.55</td>
+<td style="text-align:right">+0.55</td>
+</tr>
+<tr>
+<td>S-tight</td>
+<td>VAA</td>
+<td>9278.4 ± 1189.2</td>
+<td style="text-align:right">2.17</td>
+<td style="text-align:right">+2.17</td>
+</tr>
+<tr>
+<td></td>
+<td>GILS-uniform</td>
+<td>9091.9 ± 1084.6</td>
+<td style="text-align:right">0.21</td>
+<td style="text-align:right">+0.21</td>
+</tr>
+<tr>
+<td></td>
+<td>GILS-tabular</td>
+<td>9088.9 ± 1086.6</td>
+<td style="text-align:right">0.17</td>
+<td style="text-align:right">+0.17</td>
+</tr>
+<tr>
+<td></td>
+<td>GILS-DQN</td>
+<td>9103.1 ± 1079.5</td>
+<td style="text-align:right">0.34</td>
+<td style="text-align:right">+0.34</td>
+</tr>
+<tr>
+<td>M-none</td>
+<td>VAA</td>
+<td>2567.5 ± 354.4</td>
+<td style="text-align:right">3.97</td>
+<td style="text-align:right">+4.80</td>
+</tr>
+<tr>
+<td></td>
+<td>Paper-SA-RL5</td>
+<td>2509.5 ± 344.4</td>
+<td style="text-align:right">1.64</td>
+<td style="text-align:right">+0.99</td>
+</tr>
+<tr>
+<td></td>
+<td>GILS-uniform</td>
+<td>2479.0 ± 340.0</td>
+<td style="text-align:right">0.40</td>
+<td style="text-align:right">+0.13</td>
+</tr>
+<tr>
+<td></td>
+<td>GILS-tabular</td>
+<td>2478.5 ± 340.7</td>
+<td style="text-align:right">0.38</td>
+<td style="text-align:right">+0.11</td>
+</tr>
+<tr>
+<td></td>
+<td>GILS-DQN</td>
+<td>2478.8 ± 339.5</td>
+<td style="text-align:right">0.40</td>
+<td style="text-align:right">+0.19</td>
+</tr>
+<tr>
+<td>M-medium</td>
+<td>VAA</td>
+<td>21737.8 ± 3260.9</td>
+<td style="text-align:right">3.29</td>
+<td style="text-align:right">—</td>
+</tr>
+<tr>
+<td></td>
+<td>GILS-uniform</td>
+<td>21153.7 ± 3296.8</td>
+<td style="text-align:right">0.43</td>
+<td style="text-align:right">—</td>
+</tr>
+<tr>
+<td></td>
+<td>GILS-tabular</td>
+<td>21156.2 ± 3298.5</td>
+<td style="text-align:right">0.44</td>
+<td style="text-align:right">—</td>
+</tr>
+<tr>
+<td></td>
+<td>GILS-DQN</td>
+<td>21182.4 ± 3301.2</td>
+<td style="text-align:right">0.56</td>
+<td style="text-align:right">—</td>
+</tr>
+<tr>
+<td>M-tight</td>
+<td>VAA</td>
+<td>26982.5 ± 3985.5</td>
+<td style="text-align:right">1.26</td>
+<td style="text-align:right">—</td>
+</tr>
+<tr>
+<td></td>
+<td>GILS-uniform</td>
+<td>26701.6 ± 3952.3</td>
+<td style="text-align:right">0.21</td>
+<td style="text-align:right">—</td>
+</tr>
+<tr>
+<td></td>
+<td>GILS-tabular</td>
+<td>26697.7 ± 3951.5</td>
+<td style="text-align:right">0.19</td>
+<td style="text-align:right">—</td>
+</tr>
+<tr>
+<td></td>
+<td>GILS-DQN</td>
+<td>26721.0 ± 3956.5</td>
+<td style="text-align:right">0.28</td>
+<td style="text-align:right">—</td>
+</tr>
+<tr>
+<td>L-none</td>
+<td>VAA</td>
+<td>6050.8 ± 1701.2</td>
+<td style="text-align:right">1.67</td>
+<td style="text-align:right">—</td>
+</tr>
+<tr>
+<td></td>
+<td>Paper-SA-RL5</td>
+<td>6046.3 ± 1705.0</td>
+<td style="text-align:right">1.57</td>
+<td style="text-align:right">—</td>
+</tr>
+<tr>
+<td></td>
+<td>GILS-uniform</td>
+<td>5972.2 ± 1687.8</td>
+<td style="text-align:right">0.28</td>
+<td style="text-align:right">—</td>
+</tr>
+<tr>
+<td></td>
+<td>GILS-tabular</td>
+<td>5967.8 ± 1682.6</td>
+<td style="text-align:right">0.22</td>
+<td style="text-align:right">—</td>
+</tr>
+<tr>
+<td></td>
+<td>GILS-DQN</td>
+<td>5968.6 ± 1681.0</td>
+<td style="text-align:right">0.24</td>
+<td style="text-align:right">—</td>
+</tr>
+<tr>
+<td>L-medium</td>
+<td>VAA</td>
+<td>54288.8 ± 19106.9</td>
+<td style="text-align:right">0.88</td>
+<td style="text-align:right">—</td>
+</tr>
+<tr>
+<td></td>
+<td>GILS-uniform</td>
+<td>53955.7 ± 19029.2</td>
+<td style="text-align:right">0.19</td>
+<td style="text-align:right">—</td>
+</tr>
+<tr>
+<td></td>
+<td>GILS-tabular</td>
+<td>53935.2 ± 19034.1</td>
+<td style="text-align:right">0.14</td>
+<td style="text-align:right">—</td>
+</tr>
+<tr>
+<td></td>
+<td>GILS-DQN</td>
+<td>53962.1 ± 19028.8</td>
+<td style="text-align:right">0.20</td>
+<td style="text-align:right">—</td>
+</tr>
+<tr>
+<td>L-tight</td>
+<td>VAA</td>
+<td>124638.8 ± 34762.6</td>
+<td style="text-align:right">0.59</td>
+<td style="text-align:right">—</td>
+</tr>
+<tr>
+<td></td>
+<td>GILS-uniform</td>
+<td>123961.1 ± 34581.4</td>
+<td style="text-align:right">0.05</td>
+<td style="text-align:right">—</td>
+</tr>
+<tr>
+<td></td>
+<td>GILS-tabular</td>
+<td>123949.1 ± 34589.2</td>
+<td style="text-align:right">0.04</td>
+<td style="text-align:right">—</td>
+</tr>
+<tr>
+<td></td>
+<td>GILS-DQN</td>
+<td>123963.1 ± 34580.9</td>
+<td style="text-align:right">0.06</td>
+<td style="text-align:right">—</td>
+</tr>
+</tbody>
+</table>
+<h2 id="6-%EA%B2%B0%EA%B3%BC-%ED%95%B4%EC%84%9D">6. 결과 해석</h2>
+<ul>
+<li><strong>S-none:</strong> VAA의 gap은 6.49%, Paper-SA-RL5는 1.21%인 반면, GILS 계열은
+0.21~0.75% 수준이다. 기본 문제에서도 GILS의 개선 효과가 뚜렷하다.</li>
+<li><strong>S-medium/S-tight:</strong> Time Window가 있는 소규모 셀에서도 GILS는 CP-SAT 대비
+0.11~0.55% 수준으로 근접한다.</li>
+<li><strong>M-none:</strong> GILS는 CP-SAT incumbent 대비 0.11~0.19% 수준이다. 일부 실행에서는
+CP-SAT incumbent보다 더 좋은 해를 찾는다.</li>
+<li><strong>M/L Time Window 셀:</strong> CP-SAT가 제한 시간 안에 가능해를 못 낸 경우가 있어
+CP-SAT 대비 값은 없다. 이 경우 GILS 결과가 현재 best-known 기준이다.</li>
+<li><strong>선택기 비교:</strong> GILS-uniform, GILS-tabular, GILS-DQN의 차이는 작다. 따라서
+성능의 핵심은 학습 선택기보다는 GILS의 병목 기반 탐색 구조로 해석된다.</li>
+</ul>
+<h2 id="7-%EC%9A%94%EC%95%BD">7. 요약</h2>
+<p>VAA-GILS는 정확해와 비교 가능한 셀에서 CP-SAT incumbent에 매우 근접하고,
+기존 VAA 및 Paper-SA-RL5보다 일관되게 낮은 objective를 보인다. 특히 큰
+Time Window 셀에서는 CP-SAT가 제한 시간 내 가능해를 못 내는 경우에도 안정적으로
+best-known 해를 제공한다.</p>
+<p>또한 학습 기반 selector가 uniform selector를 안정적으로 이기지 못했다. 따라서
+본 연구의 핵심 주장은 “RL selector가 성능을 만든다”가 아니라, <strong>문제 구조를
+활용한 guided ILS 엔진이 성능을 만든다</strong>는 방향이 더 적절하다.</p>
+<h2 id="8-%EB%85%BC%EC%9D%98-%ED%8F%AC%EC%9D%B8%ED%8A%B8">8. 논의 포인트</h2>
+<ul>
+<li>방법 이름은 VAA-GILS로 정리하는 것이 결과와 잘 맞는다.</li>
+<li>near-optimal 주장은 CP-SAT 기준이 있는 셀로 제한하는 것이 보수적이다.</li>
+<li>큰 Time Window 셀에서는 CP-SAT 대비가 아니라 best-known 기준으로 해석해야 한다.</li>
+<li>DQN 결과는 주 방법이 아니라 selector ablation 또는 negative finding으로 배치하는 것이 자연스럽다.</li>
+</ul>
+
+</body>
+</html>

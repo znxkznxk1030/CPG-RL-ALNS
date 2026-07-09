@@ -1,14 +1,5 @@
 # APIEMS 2026 full paper draft (v1, 2026-07-06)
 
-> Formatting note: APIEMS 2026 full papers are limited to 8 pages; the official
-> template (Word) must be downloaded from https://www.apiems2026.org/ at
-> submission time. This draft is template-agnostic; pour sections in order.
-> Author names/affiliations are placeholders — fill before submission.
-> If space is tight after template pour: drop the L-medium/L-tight rows of
-> Table 1 (mention in text), or the std column; Sections 2 and 7 compress well.
-
----
-
 **Title:** Compound-Truck Cross-Docking Scheduling with Arrival Time Windows:
 A Guided Iterated Local Search Matching Exact Incumbents, and the Limits of
 Learned Operator Selection
