@@ -1,8 +1,7 @@
 # APIEMS 2026 full paper draft (v1, 2026-07-06)
 
 **Title:** Compound-Truck Cross-Docking Scheduling with Arrival Time Windows:
-A Guided Iterated Local Search Matching Exact Incumbents, and the Limits of
-Learned Operator Selection
+A Bottleneck-Guided Iterated Local Search with Exact-Solver Verification
 
 **Author:** Youngsoo Kim¹ — ¹Department of Artificial Intelligence, Yonsei
 University, Seoul, Republic of Korea (znxkznxk1030@yonsei.ac.kr)
@@ -16,26 +15,30 @@ makespan only. We introduce the first extension with per-truck arrival
 (release) times and soft departure due dates, minimizing makespan plus weighted
 total tardiness; we provide a mixed-integer formulation, a CP-SAT constraint
 model, valid combinatorial lower bounds, and a reproducible benchmark with
-strict train/tuning/test seed separation. We then propose VAA-GILS, a guided
-iterated local search that combines a Vogel-approximation construction,
-best-improvement descent, bottleneck-guided operators, simulated-annealing
-acceptance, and kick restarts. On every test cell where an exact reference
-exists, VAA-GILS reaches objective values within 0.1–0.6% of CP-SAT incumbents
-— matching provably optimal solutions on small instances — in under one
+strict train/tuning/test seed separation. We then propose VAA-GILS, a
+bottleneck-guided iterated local search that combines a Vogel-approximation
+construction, best-improvement descent, operators that steer moves toward the
+makespan-critical and most-tardy trucks, simulated-annealing acceptance, and
+kick restarts. On every test cell where an exact reference exists, VAA-GILS
+reaches objective values within 0.1–0.6% of CP-SAT incumbents — matching
+provably optimal solutions on the small no-time-window instances — in under one
 second, versus 76–376 seconds for CP-SAT; on larger time-window cells, where
 CP-SAT returns no feasible solution within 600 seconds, VAA-GILS provides all
-best-known solutions. It significantly outperforms the
+best-known solutions, and it significantly outperforms the
 reinforcement-learning-based simulated annealing of the original model
-(p < 10⁻⁴). Finally, we equip the
-engine with interchangeable operator-selection policies (uniform random,
-tabular Q-learning, and a transfer-trained deep Q-network with scale-invariant
-features) and show that selection policies produce statistically detectable but
-practically negligible effects (≤0.17 percentage points), with no computation
-budget at which the learned policy wins. We characterize the conditions under
-which learned selection cannot pay off and discuss settings where it can.
+(p < 10⁻⁴). A controlled ablation then decomposes where the quality comes from:
+the deterministic search structure — best-improvement descent, the
+bottleneck-guided operators, and kick restarts — accounts for it, whereas three
+adaptive levers do not. Removing the guided operators significantly worsens the
+objective in every cell, while learned operator selection (tabular Q-learning
+and a transfer-trained deep Q-network), a learned or improved initial solution,
+and stochastic acceptance each change the objective by at most a fifth of a
+percentage point, with no computation budget at which the learned policy wins.
+We characterize the conditions under which such adaptive components cannot pay
+off in this regime.
 
 **Keywords:** cross-docking; truck scheduling; time windows; iterated local
-search; reinforcement learning; constraint programming
+search; constraint programming; guided local search
 
 ## 1. Introduction
 
@@ -73,21 +76,31 @@ This paper makes three contributions.
    significantly dominates the reinforcement-learning-based simulated
    annealing proposed for the original problem.
 
-3. **Analysis.** Using the engine as a controlled apparatus, we compare three
-   interchangeable operator-selection policies — uniform random, the original
-   model's tabular Q-learning, and a deep Q-network trained offline on a
-   separate instance distribution with scale-invariant features. Across
-   budgets from 50 to 3,000 iterations, no learned policy ever outperforms
-   uniform random by a practically meaningful margin, and the transfer-trained
-   DQN is *significantly worse* at large budgets. We explain the mechanism —
-   the search attractor is independent of the selection policy — and derive
-   conditions under which learned selection can and cannot help.
+3. **Analysis.** Using the engine as a controlled apparatus, we decompose where
+   its quality comes from. An operator-pool ablation shows that the
+   bottleneck-guided operators lower the objective consistently and
+   significantly in every cell (monotone, p < 0.002). A component ablation
+   ranks the engine's parts: best-improvement descent is the dominant
+   contributor, followed by kick restarts, while the Vogel-approximation
+   initial solution is statistically irrelevant and stochastic acceptance is
+   not a driver. Against this, three adaptive levers add nothing: learned
+   operator selection (tabular Q-learning and a transfer-trained deep Q-network)
+   never beats uniform random by a practically meaningful margin at any budget
+   from 50 to 3,000 iterations and is significantly worse at large budgets; a
+   learned or improved initial solution converges to the same attractor; and
+   stochastic acceptance is dispensable. We explain the mechanism — a strong
+   deterministic local search reaches a near-optimal attractor independent of
+   these levers — and derive conditions under which such components can and
+   cannot help.
 
-The third contribution speaks to a broader methodological concern: learned
-components inside metaheuristics are frequently evaluated against weak
-baselines or without equal-budget controls. Our results provide a carefully
-controlled negative example on a problem where the original literature claims
-reinforcement learning as a core ingredient [5].
+The third contribution speaks to a broader methodological concern: adaptive
+components inside metaheuristics are often evaluated against weak baselines or
+without equal-budget, equal-structure controls. Within our reimplementation and
+benchmark we find that, once a strong deterministic local search is in place,
+the learned operator selection of the base model [5] adds no measurable benefit
+over uniform random selection; we report this as a controlled decomposition of
+our own engine rather than as a claim about the original study, whose setting
+and implementation differ from ours.
 
 ## 2. Related work
 
@@ -215,9 +228,12 @@ descent and guided moves cheap.
 
 ### 4.1 Operator-selection policies
 
-The selection policy is a plug-in, which lets us isolate its contribution:
+The selection policy is a plug-in, which lets us isolate its contribution. The
+engine's default is uniform random selection; the two learned policies below are
+evaluated only as ablation arms (Section 6.2), not as part of the proposed
+method.
 
-- **Uniform**: uniform random choice over the operator pool.
+- **Uniform** (default): uniform random choice over the operator pool.
 - **Tabular Q** (the policy of SA-RL5 [5]): Q-learning [9] over five
   stagnation-bin states, trained online within the run; ε-greedy with roulette
   exploitation, shaped reward (2 for a new incumbent, 1 for a non-worsening
@@ -330,69 +346,125 @@ as future work.
 237 s (M), 376 s (L). GILS attains its quality at roughly 70–700× less
 computation.
 
-### 6.2 Does learned operator selection help?
+### 6.2 Where does the quality come from?
 
-Table 2 summarizes paired comparisons of the three selection policies at 1,000
-iterations and across budgets.
+We decompose the engine with three controlled ablations that all hold the
+computation budget fixed at 1,000 iterations. The first two vary the
+deterministic structure; the third varies the adaptive selection policy. All
+three use uniform random selection except where the policy is itself the
+variable, so the comparisons are equal-budget and equal-structure.
 
-**Table 2.** Selection-policy effects (two-sided Wilcoxon; positive mean =
-first method better).
+**Operator pool (guided operators).** We fix the selection policy to uniform
+and vary only the operator pool: *generic* (the seven paper neighborhoods),
+*critical* (generic plus the two makespan-critical guided operators g1, g2), and
+*full* (critical plus the two tardiness-guided operators g3, g4). The mean gap
+to the per-instance best-known solution is monotone — generic ≥ critical ≥ full
+— in every one of the nine cells (e.g., S-none 0.45 / 0.17 / 0.10; M-medium
+0.45 / 0.37 / 0.28). Table 2 gives the paired tests.
 
-| Comparison (1,000 iters) | Mean diff (%) | p | Verdict |
+**Table 2.** Operator-pool ablation (two-sided Wilcoxon; +mean = the richer
+pool, which adds the guided operators, is better).
+
+| Contrast | Scope | n | Mean (%) | p | Verdict |
+|---|---|---:|---:|---:|---|
+| generic → critical (add g1, g2) | all | 136 | +0.114 | <10⁻⁴ | significant |
+| critical → full (add g3, g4) | all | 172 | +0.048 | <10⁻⁴ | significant |
+| critical → full | TW cells | 116 | +0.045 | 0.0004 | significant |
+| generic → full (all guided) | all | 166 | +0.161 | <10⁻⁴ | significant |
+
+The guided operators lower the objective consistently and significantly, and
+the effect never flips sign. (On no-time-window cells the g3/g4 gain is partly a
+selection-weight effect, since they fall back to g1/g2 when no truck is late;
+the unambiguous new-capability results are generic → critical everywhere and
+critical → full on the time-window cells.)
+
+**Engine components.** Holding the pool at *full* and the policy at uniform, we
+remove one engine component at a time and measure the resulting degradation
+(Table 3). Best-improvement descent is the dominant contributor and kick
+restarts are second, both significant everywhere. The Vogel-approximation
+initial solution is statistically irrelevant once split by cell type — starting
+from a random feasible solution reaches essentially the same objective —
+consistent with a separate sensitivity test in which a purely random start
+(26–31% worse than VAA) changes the final objective by at most ±0.33%. Removing
+stochastic acceptance (making it greedy) does *not* worsen the objective on
+average, and is marginally better at M and L; the deterministic descent,
+restarts, and guided operators already reach the attractor without it.
+
+**Table 3.** Engine-component ablation (leave-one-out; degradation = relative
+objective increase when the component is removed; two-sided Wilcoxon, all cells).
+
+| Component removed | n | Degradation (%) | p | Verdict |
+|---|---:|---:|---:|---|
+| best-improvement descent | 220 | +0.156 | <10⁻⁴ | significant |
+| kick restart | 172 | +0.069 | <10⁻⁴ | significant |
+| VAA initial solution | 217 | +0.022 | 0.014 | negligible (n.s. by cell) |
+| stochastic acceptance | 215 | −0.026 | 0.0001 | not a driver (greedy ≈ or better) |
+
+**Learned operator selection.** Finally we vary the selection policy itself,
+holding pool and components at *full*: uniform random, the base model's tabular
+Q-learning, and a transfer-trained deep Q-network (Table 4). No learned policy
+beats uniform by a practically meaningful margin. Across budgets (mean gap to
+best-known) uniform runs 0.47 → 0.16%, tabular 0.56 → 0.09%, and DQN 0.56 →
+0.26% from 50 to 3,000 iterations: at 50 iterations uniform is *better* than
+tabular (+0.08%, p < 10⁻³), at 3,000 tabular edges uniform (+0.07%, p < 10⁻⁴),
+and the transfer DQN never wins at any budget and is significantly worse at
+1,000 and 3,000. All selection effects are ≤ 0.17 percentage points — below the
+guided-operator effect of Table 2 and an order of magnitude below the
+method-level differences of Table 1 — and their direction flips with budget.
+
+**Table 4.** Selection-policy effects at 1,000 iterations (two-sided Wilcoxon;
+positive mean = first method better).
+
+| Comparison | Mean diff (%) | p | Verdict |
 |---|---:|---:|---|
 | tabular vs uniform | 0.00 | 0.28 | no difference |
 | tabular vs DQN | +0.14 | <10⁻⁴ | DQN worse |
 | uniform vs DQN | +0.14 | <10⁻⁴ | DQN worse |
 
-Across budgets (mean gap to per-instance best-known): uniform 0.47 → 0.16%,
-tabular 0.56 → 0.09%, DQN 0.56 → 0.26% as the budget grows from 50 to 3,000
-iterations. At 50 iterations uniform is *better* than tabular (+0.08%,
-p < 10⁻³); at 3,000, tabular is better than uniform (+0.07%, p < 10⁻⁴); the
-transfer DQN never wins at any budget and is significantly worse at 1,000 and
-3,000. All selection effects are ≤ 0.17 percentage points — an order of
-magnitude below the method-level differences in Table 1 — and their direction
-flips with budget.
+Together the three ablations locate the quality unambiguously: it comes from the
+deterministic structure — descent, the bottleneck-guided operators, and kick
+restarts — while the adaptive levers (learned selection, learned/good
+initialization, stochastic acceptance) do not contribute. As a point check, on
+a tuning instance the engine's converged value coincides *exactly* with the
+CP-SAT incumbent found after 240 s: the search reaches a near-optimal attractor
+regardless of which operator fires when, leaving no room for a selection policy
+to matter.
 
-Two further controls confirm the mechanism. First, an initial-solution
-sensitivity test: starting the engine from a purely random solution (26–31%
-worse than VAA) changes the final objective by at most ±0.33% — the engine's
-attractor is essentially independent of the start. Second, on a tuning
-instance the engine's converged value coincides *exactly* with the CP-SAT
-incumbent found after 240 s. Together these show that descent, guided
-operators, and kick restarts drive the search to a near-optimal attractor
-regardless of which operator fires when; there is simply no room left for a
-selection policy to matter.
+## 7. Discussion: when can adaptive components pay off?
 
-## 7. Discussion: when can learned selection pay off?
-
-Our negative result is conditional, and the conditions are informative. Learned
-operator selection was voided here by the conjunction of: (i) *cheap
+Our negative result is conditional, and the conditions are informative. The
+adaptive levers — learned operator selection, learned initialization, and
+stochastic acceptance — were voided here by the conjunction of: (i) *cheap
 evaluation* — tens of microseconds per candidate, so poor proposals cost almost
 nothing and are filtered by acceptance; (ii) a *static, deterministic* problem
 — nothing to predict across decisions; (iii) *saturating budgets* — the
-attractor is reached well within 1,000 iterations; and (iv) a *strong local
-search* — descent finishes whatever a lucky move starts. Negating any of these
-restores room for learning: expensive (e.g., simulation-based) evaluation makes
-each proposal precious; dynamic arrivals make anticipation structurally
-valuable (re-optimization cannot see the future); tight real-time decision
-budgets preclude search altogether; and much larger instances stretch budgets
-past saturation. We conjecture that reported successes of learned selection
-concentrate in such regimes, and that equal-budget comparisons against uniform
-selection inside strong engines — as done here — should be a standard control.
+attractor is reached well within 1,000 iterations; and (iv) a *strong
+structure-guided local search* — descent and the bottleneck-guided operators
+finish whatever a lucky move starts. Negating any of these restores room for
+adaptation: expensive (e.g., simulation-based) evaluation makes each proposal
+precious; dynamic arrivals make anticipation structurally valuable
+(re-optimization cannot see the future); tight real-time decision budgets
+preclude search altogether; and much larger instances stretch budgets past
+saturation. We conjecture that reported successes of learned selection
+concentrate in such regimes, and that equal-budget, equal-structure comparisons
+against uniform selection inside strong engines — as done here — should be a
+standard control.
 
 ## 8. Conclusion
 
 We introduced the time-window extension of compound-truck cross-docking
 scheduling with partial unloading, together with exact models, valid bounds,
-and a reproducible benchmark. A deterministic guided iterated local search
-matches exact incumbents within a fraction of a percent wherever they exist —
-including proven optima — and supplies the best-known solutions in seconds
-where the exact solver fails; a controlled study shows that learned operator
-selection — both
-the online tabular Q-learning proposed in the original literature and an
-offline-trained transfer DQN — provides no practical benefit in this regime.
+and a reproducible benchmark. A deterministic bottleneck-guided iterated local
+search matches exact incumbents within a fraction of a percent wherever they
+exist — including proven optima on the small no-time-window instances — and
+supplies the best-known solutions in seconds where the exact solver fails. A
+three-part controlled ablation locates the quality in the deterministic
+structure: best-improvement descent and the bottleneck-guided operators are the
+significant contributors, while learned operator selection (online tabular
+Q-learning and an offline-trained transfer DQN), a learned or improved initial
+solution, and stochastic acceptance provide no practical benefit in this regime.
 Future work includes the dynamic variant with online arrival revelation, where
-learned policies are structurally advantaged, and tighter lower bounds for
+adaptive policies are structurally advantaged, and tighter lower bounds for
 large time-window instances.
 
 ## References

@@ -1,0 +1,29 @@
+=== Mean objective degradation%% when a component is removed, by cell ===
+cell              init   descent        sa   restart
+L-medium          0.10      0.27     -0.06      0.02
+L-tight           0.11      0.26     -0.01      0.00
+L-none            0.05      0.13     -0.10      0.06
+M-medium         -0.08      0.21     -0.03      0.11
+M-tight           0.05      0.16     -0.07      0.06
+M-none            0.07      0.19     -0.07      0.04
+S-medium         -0.02      0.16      0.06      0.17
+S-tight          -0.10     -0.04      0.04     -0.00
+S-none            0.02      0.08      0.02      0.17
+
+=== Paired Wilcoxon: degradation from removing each component ===
+component removed   scope         n  degrade%         p       verdict
+init                all         217    +0.022    0.0135   significant
+init                none         70    +0.047    0.0653 no difference
+init                TW          147    +0.010    0.0738 no difference
+descent             all         220    +0.156    0.0000   significant
+descent             none         70    +0.132    0.0001   significant
+descent             TW          150    +0.169    0.0000   significant
+sa                  all         215    -0.026    0.0001   significant
+sa                  none         68    -0.051    0.0182   significant
+sa                  TW          147    -0.014    0.0010   significant
+restart             all         172    +0.069    0.0000   significant
+restart             none         64    +0.090    0.0002   significant
+restart             TW          108    +0.058    0.0000   significant
+
+Reading: degrade%% > 0 means removing the component worsens the objective,
+so the component contributes. Larger = more important.

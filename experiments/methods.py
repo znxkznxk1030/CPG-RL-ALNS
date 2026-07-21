@@ -171,6 +171,53 @@ def _gils_pool(iterations: int, pool: str) -> MethodFn:
     return method
 
 
+def _gils_ablate(iterations: int, drop: str) -> MethodFn:
+    """GILS (uniform selector, full pool) with one engine component removed.
+
+    Leave-one-out component ablation (Phase B2). `drop` in:
+      none    -> full engine (reference, == GILS-uniform);
+      init    -> VAA construction replaced by a random feasible start;
+      descent -> best-improvement descent removed;
+      sa      -> SA acceptance replaced by greedy (accept only improvements);
+      restart -> kick-restart on stagnation removed.
+    """
+
+    def method(instance: CrossDockInstance, seed: int, budget_sec: float | None) -> dict:
+        import random
+
+        from crossdock_solver.rl.selectors import UniformSelector
+
+        weight = _auto_weight(instance)
+        initial = None
+        if drop == "init":
+            from crossdock_solver.initial.random_init import random_feasible_solution
+
+            initial = random_feasible_solution(instance, random.Random(seed))
+
+        run = run_vaa_qrl(
+            instance,
+            VaaQRLConfig(
+                max_iterations=iterations,
+                time_budget_sec=budget_sec,
+                tardiness_weight=weight,
+                seed=seed,
+                use_descent=(drop != "descent"),
+                use_sa_acceptance=(drop != "sa"),
+                use_restart=(drop != "restart"),
+            ),
+            initial_solution=initial,
+            selector=UniformSelector(ACTIONS_TW),
+        )
+        return {
+            "makespan": run.result.makespan,
+            "total_tardiness": run.result.total_tardiness,
+            "objective": run.result.makespan + weight * run.result.total_tardiness,
+            "runtime_sec": run.runtime_sec,
+        }
+
+    return method
+
+
 def _cpsat(time_limit_sec: float) -> MethodFn:
     def method(instance: CrossDockInstance, seed: int, budget_sec: float | None) -> dict:
         from crossdock_solver.exact.cpsat import ExactCPSATConfig, solve_exact_cpsat
@@ -223,6 +270,11 @@ METHOD_REGISTRY: dict[str, MethodFn] = {
     "GILS-generic-1000": _gils_pool(1000, "generic"),
     "GILS-critical-1000": _gils_pool(1000, "critical"),
     "GILS-full-1000": _gils_pool(1000, "full"),
+    "GILS-ablate-none-1000": _gils_ablate(1000, "none"),
+    "GILS-ablate-init-1000": _gils_ablate(1000, "init"),
+    "GILS-ablate-descent-1000": _gils_ablate(1000, "descent"),
+    "GILS-ablate-sa-1000": _gils_ablate(1000, "sa"),
+    "GILS-ablate-restart-1000": _gils_ablate(1000, "restart"),
     "CPSAT-300": _cpsat(300.0),
     "CPSAT-600": _cpsat(600.0),
 }

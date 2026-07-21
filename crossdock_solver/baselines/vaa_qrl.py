@@ -63,6 +63,12 @@ class VaaQRLConfig:
     restart_kick: int = 3
     reheat_ratio: float = 0.02
     new_best_reward: float = 2.0
+    # Component toggles for the engine ablation (Phase B2). All True reproduces
+    # the standard engine byte-for-byte. use_sa_acceptance=False makes acceptance
+    # greedy (accept a candidate only when it improves the current solution).
+    use_descent: bool = True
+    use_sa_acceptance: bool = True
+    use_restart: bool = True
     seed: int | None = None
     name: str = "VAA-QRL"
 
@@ -96,7 +102,8 @@ def run_vaa_qrl(
 
     current = initial_solution.copy() if initial_solution is not None else vaa_solution(instance)
     current_result = fast.evaluate(current)
-    current, current_result = _descent(instance, current, current_result, fast, deadline)
+    if config.use_descent:
+        current, current_result = _descent(instance, current, current_result, fast, deadline)
     best = current.copy()
     best_result = current_result
     temperature = (
@@ -179,9 +186,10 @@ def run_vaa_qrl(
         candidate_result = fast.evaluate(candidate)
 
         if candidate_result.objective < best_result.objective - EPSILON:
-            candidate, candidate_result = _descent(
-                instance, candidate, candidate_result, fast, deadline
-            )
+            if config.use_descent:
+                candidate, candidate_result = _descent(
+                    instance, candidate, candidate_result, fast, deadline
+                )
             best = candidate.copy()
             best_result = candidate_result
             reward = config.new_best_reward
@@ -195,14 +203,20 @@ def run_vaa_qrl(
         )
         next_state = _state_from_no_improvement(next_no_improvement, config.thresholds)
 
-        if accept_by_sa(current_result.objective, candidate_result.objective, temperature, rng):
+        if config.use_sa_acceptance:
+            accepted = accept_by_sa(
+                current_result.objective, candidate_result.objective, temperature, rng
+            )
+        else:
+            accepted = candidate_result.objective < current_result.objective - EPSILON
+        if accepted:
             current = candidate
             current_result = candidate_result
 
         no_improvement_count = next_no_improvement
         temperature *= config.cooling_rate
 
-        if since_best >= config.restart_after:
+        if config.use_restart and since_best >= config.restart_after:
             current = best.copy()
             for _ in range(config.restart_kick):
                 kick = NEIGHBORHOODS[rng.choice(tuple(NEIGHBORHOODS))]
@@ -216,7 +230,8 @@ def run_vaa_qrl(
             tracker.update(action, reward > 0.0)
         selector.observe(context, action, reward, _context(iteration + 1, next_state))
 
-    best, _ = _descent(instance, best, best_result, fast, deadline)
+    if config.use_descent:
+        best, _ = _descent(instance, best, best_result, fast, deadline)
 
     return BaselineRun(
         name=f"{config.name}-{config.max_iterations}",
