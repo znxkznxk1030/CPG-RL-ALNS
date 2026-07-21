@@ -1,0 +1,24 @@
+=== Mean gap%% to per-instance best-known, by cell and pool ===
+cell           generic  critical      full
+L-medium          0.09      0.07      0.06
+L-tight           0.01      0.01      0.00
+L-none            0.22      0.17      0.12
+M-medium          0.45      0.37      0.28
+M-tight           0.25      0.19      0.11
+M-none            0.39      0.28      0.24
+S-medium          0.41      0.17      0.08
+S-tight           0.35      0.17      0.16
+S-none            0.45      0.17      0.10
+
+=== Paired Wilcoxon (two-sided); mean%% = improvement from adding ops ===
+(pool_b -> pool_a where pool_a is the richer pool; +mean%% = richer is better)
+contrast                          scope         n    mean%         p       verdict
+generic -> critical               all         136   +0.114    0.0000   significant
+critical -> full                  all         172   +0.048    0.0000   significant
+critical -> full                  TW-only     116   +0.045    0.0004   significant
+critical -> full                  none-only    56   +0.053    0.0014   significant
+generic -> full                   all         166   +0.161    0.0000   significant
+
+Reading: mean%% = 100*(objective_pool_b - objective_pool_a)/pool_a, so a
+positive value means the richer pool (pool_a: adds the guided operators)
+has the lower objective, i.e., the guided operators help.

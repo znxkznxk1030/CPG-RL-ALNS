@@ -11,10 +11,28 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Callable
 
-from crossdock_solver.baselines.paper_sa_rl import PaperSARLConfig, run_paper_sa_rl
+from crossdock_solver.baselines.paper_sa_rl import (
+    NEIGHBORHOODS,
+    PaperSARLConfig,
+    run_paper_sa_rl,
+)
 from crossdock_solver.baselines.vaa import run_vaa
-from crossdock_solver.baselines.vaa_qrl import ACTIONS_TW, VaaQRLConfig, run_vaa_qrl
+from crossdock_solver.baselines.vaa_qrl import ACTIONS, ACTIONS_TW, VaaQRLConfig, run_vaa_qrl
 from crossdock_solver.data.instance import CrossDockInstance
+
+
+# Operator pools for the guided-operator ablation (Phase B1). The selection
+# policy is held fixed (uniform random) so that only the pool changes:
+#   generic  = the 7 paper neighborhoods, no guidance;
+#   critical = generic + g1/g2 (bottleneck-guided moves on the makespan-critical
+#              door/truck);
+#   full     = critical + g3/g4 (tardiness-guided moves), == ACTIONS_TW.
+GENERIC_ACTIONS: tuple[str, ...] = tuple(NEIGHBORHOODS)
+OPERATOR_POOLS: dict[str, tuple[str, ...]] = {
+    "generic": GENERIC_ACTIONS,
+    "critical": ACTIONS,
+    "full": ACTIONS_TW,
+}
 
 
 MethodFn = Callable[[CrossDockInstance, int, float | None], dict]
@@ -118,6 +136,41 @@ def _gils(iterations: int, selector_name: str = "tabular") -> MethodFn:
     return method
 
 
+def _gils_pool(iterations: int, pool: str) -> MethodFn:
+    """GILS with uniform selection over a restricted operator pool.
+
+    Guided-operator ablation (Phase B1): selection policy is fixed to uniform
+    random, and only the operator pool varies (generic / critical / full). This
+    isolates the contribution of the bottleneck- and tardiness-guided operators,
+    which the selector ablation cannot show.
+    """
+
+    actions = OPERATOR_POOLS[pool]
+
+    def method(instance: CrossDockInstance, seed: int, budget_sec: float | None) -> dict:
+        from crossdock_solver.rl.selectors import UniformSelector
+
+        weight = _auto_weight(instance)
+        run = run_vaa_qrl(
+            instance,
+            VaaQRLConfig(
+                max_iterations=iterations,
+                time_budget_sec=budget_sec,
+                tardiness_weight=weight,
+                seed=seed,
+            ),
+            selector=UniformSelector(actions),
+        )
+        return {
+            "makespan": run.result.makespan,
+            "total_tardiness": run.result.total_tardiness,
+            "objective": run.result.makespan + weight * run.result.total_tardiness,
+            "runtime_sec": run.runtime_sec,
+        }
+
+    return method
+
+
 def _cpsat(time_limit_sec: float) -> MethodFn:
     def method(instance: CrossDockInstance, seed: int, budget_sec: float | None) -> dict:
         from crossdock_solver.exact.cpsat import ExactCPSATConfig, solve_exact_cpsat
@@ -167,6 +220,9 @@ METHOD_REGISTRY: dict[str, MethodFn] = {
     "GILS-3000": _gils(3000, "tabular"),
     "GILS-uniform-3000": _gils(3000, "uniform"),
     "GILS-dqn-3000": _gils(3000, "dqn"),
+    "GILS-generic-1000": _gils_pool(1000, "generic"),
+    "GILS-critical-1000": _gils_pool(1000, "critical"),
+    "GILS-full-1000": _gils_pool(1000, "full"),
     "CPSAT-300": _cpsat(300.0),
     "CPSAT-600": _cpsat(600.0),
 }
