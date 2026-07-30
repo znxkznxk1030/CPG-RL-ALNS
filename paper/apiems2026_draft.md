@@ -412,6 +412,15 @@ and the transfer DQN never wins at any budget and is significantly worse at
 guided-operator effect of Table 2 and an order of magnitude below the
 method-level differences of Table 1 — and their direction flips with budget.
 
+Crucially, the same picture holds on the no-time-window cells alone, which are
+exactly the original problem of [5] with all trucks available at time zero: at
+1,000 iterations tabular Q-learning is indistinguishable from uniform (mean
+−0.01%, p = 0.76, n = 66) and the transfer DQN is significantly worse (uniform
+better by +0.17%, p = 0.002; tabular better by +0.16%, p < 10⁻³). The negative
+result is therefore not an artifact of the time-window extension; it already
+holds in the base setting where the original model introduces learned
+selection.
+
 **Table 4.** Selection-policy effects at 1,000 iterations (two-sided Wilcoxon;
 positive mean = first method better).
 
