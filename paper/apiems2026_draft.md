@@ -372,6 +372,13 @@ pool, which adds the guided operators, is better).
 | critical → full | TW cells | 116 | +0.045 | 0.0004 | significant |
 | generic → full (all guided) | all | 166 | +0.161 | <10⁻⁴ | significant |
 
+![Operator-pool ablation: mean gap to best-known per cell for the generic,
+critical, and full pools.](figures/fig2_operator_pool.svg)
+
+**Figure 1.** Operator-pool ablation. Adding the bottleneck-guided operators
+lowers the mean gap to best-known in every one of the nine cells; the ordering
+generic > critical > full is monotone throughout.
+
 The guided operators lower the objective consistently and significantly, and
 the effect never flips sign. (On no-time-window cells the g3/g4 gain is partly a
 selection-weight effect, since they fall back to g1/g2 when no truck is late;
@@ -399,6 +406,14 @@ objective increase when the component is removed; two-sided Wilcoxon, all cells)
 | kick restart | 172 | +0.069 | <10⁻⁴ | significant |
 | VAA initial solution | 217 | +0.022 | 0.014 | negligible (n.s. by cell) |
 | stochastic acceptance | 215 | −0.026 | 0.0001 | not a driver (greedy ≈ or better) |
+
+![Engine-component leave-one-out: objective degradation when each component is
+removed.](figures/fig3_component_ablation.svg)
+
+**Figure 2.** Engine-component leave-one-out ablation. Best-improvement descent
+and kick restarts are the significant contributors; the VAA initial solution is
+statistically irrelevant and removing stochastic acceptance does not worsen the
+objective.
 
 **Learned operator selection.** Finally we vary the selection policy itself,
 holding pool and components at *full*: uniform random, the base model's tabular
@@ -429,6 +444,14 @@ positive mean = first method better).
 | tabular vs uniform | 0.00 | 0.28 | no difference |
 | tabular vs DQN | +0.14 | <10⁻⁴ | DQN worse |
 | uniform vs DQN | +0.14 | <10⁻⁴ | DQN worse |
+
+![Selection-policy budget sweep: mean gap to best-known versus iteration budget
+for uniform, tabular Q-learning, and transfer DQN.](figures/fig1_selector_budget.svg)
+
+**Figure 3.** Selection-policy budget sweep. Across budgets from 50 to 3,000
+iterations, neither learned policy beats uniform random selection by a
+practically meaningful margin; the transfer DQN is consistently worse and the
+tabular policy only edges uniform at the largest budget.
 
 Together the three ablations locate the quality unambiguously: it comes from the
 deterministic structure — descent, the bottleneck-guided operators, and kick
