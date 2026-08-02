@@ -217,7 +217,8 @@ without a new incumbent, the search restarts from the best solution perturbed
 by three random moves, with reheating.
 
 **Operator pool.** Seven generic neighborhood moves from [5] (destination
-swaps, door swaps, insertions) plus four *guided* operators that first identify
+swaps, door swaps, insertions; the base model numbers its moves k1–k8 but
+defines no k5, so seven are implemented) plus four *guided* operators that first identify
 the current bottleneck and then perform a best-of mini-search around it:
 (g1) relocate the last outbound truck on the critical door to its best
 door/position; (g2) swap the critical truck's destination against all trucks;
@@ -245,6 +246,39 @@ method.
   rates). It is trained offline on 500 runs over a *training* instance pool
   (sizes S/M, all flow patterns and window levels) and applied zero-shot
   (ε = 0, no updates) to unseen test instances.
+
+### 4.2 Relation to the base model [5]
+
+VAA-GILS shares the construction heuristic and the seven generic neighborhoods
+of the base model [5], and like it applies exactly one operator per iteration.
+The differences are structural, and Table 1 makes them explicit: [5] is a *pure*
+simulated-annealing method in which the reinforcement-learning policy chooses
+which single move to apply and the step ends at the SA accept/reject; VAA-GILS
+embeds that same one-operator step inside an iterated local search, adding
+bottleneck-guided operators, a best-improvement descent after every improving
+move, and kick restarts with reheating.
+
+**Table 1.** Base model [5] versus VAA-GILS.
+
+| Aspect | Base SA-RL5 [5] | VAA-GILS (ours) |
+|---|---|---|
+| Overall framework | Pure simulated annealing | Iterated local search (SA only as acceptance) |
+| Operators per iteration | One | One (same) |
+| Operator pool | 7 neighborhoods (numbered k1–k8, k5 unused) | Those 7 + 4 bottleneck-guided (g1–g4) |
+| Guided-move mechanics | Roulette-wheel single move (k6–k8) | Deterministic best-of scan around the makespan-critical / most-tardy truck |
+| Which operator fires | Online Q-learning / roulette | Uniform random (learned selection kept only as ablation; no benefit) |
+| After an improving move | Nothing — the SA step is the whole iteration | Full best-improvement descent to a local optimum |
+| Stagnation handling | None | Kick restart from best + reheating |
+| Acceptance | SA (Metropolis) | SA (Metropolis) — shown dispensable by ablation (Section 6.2) |
+| Construction | VAA | VAA, extended with release times |
+| Objective | Makespan | Makespan + λ · total tardiness (time windows) |
+
+Two of these rows carry the paper's message. First, the "after an improving
+move" row is why our per-iteration work is not a single move: the guided
+operator only *starts* an improvement that the descent finishes, which the later
+ablation identifies as the dominant quality contributor. Second, the "which
+operator fires" row is exactly the lever that [5] learns and that we find
+inert once the deterministic structure above is in place.
 
 ## 5. Experimental design
 
@@ -275,12 +309,12 @@ exists: on the S cells (CP-SAT, 300 s per instance; optimality proven on all
 five S-none instances) and on M-none (CP-SAT, 600 s, two instances). On the
 remaining cells CP-SAT returns no feasible solution within 600 s; there our
 claim is dominance over all baselines, and the reported solutions are, to our
-knowledge, the best known. Accordingly, Table 1 reports the gap to the
+knowledge, the best known. Accordingly, Table 2 reports the gap to the
 *best-known* solution per instance (Δbk, over all methods, all budgets, and
 CP-SAT) as the primary quality measure, and the gap to the CP-SAT reference
 where one exists.
 
-**Table 1.** Test-pool results (5 instances × 5 reps per cell). Δbk = mean gap
+**Table 2.** Test-pool results (5 instances × 5 reps per cell). Δbk = mean gap
 to the per-instance best-known solution. vs CP-SAT: S cells over all 5
 instances (S-none: proven optima); M-none over the 2 instances attempted.
 
@@ -360,9 +394,9 @@ and vary only the operator pool: *generic* (the seven paper neighborhoods),
 *full* (critical plus the two tardiness-guided operators g3, g4). The mean gap
 to the per-instance best-known solution is monotone — generic ≥ critical ≥ full
 — in every one of the nine cells (e.g., S-none 0.45 / 0.17 / 0.10; M-medium
-0.45 / 0.37 / 0.28). Table 2 gives the paired tests.
+0.45 / 0.37 / 0.28). Table 3 gives the paired tests.
 
-**Table 2.** Operator-pool ablation (two-sided Wilcoxon; +mean = the richer
+**Table 3.** Operator-pool ablation (two-sided Wilcoxon; +mean = the richer
 pool, which adds the guided operators, is better).
 
 | Contrast | Scope | n | Mean (%) | p | Verdict |
@@ -387,7 +421,7 @@ critical → full on the time-window cells.)
 
 **Engine components.** Holding the pool at *full* and the policy at uniform, we
 remove one engine component at a time and measure the resulting degradation
-(Table 3). Best-improvement descent is the dominant contributor and kick
+(Table 4). Best-improvement descent is the dominant contributor and kick
 restarts are second, both significant everywhere. The Vogel-approximation
 initial solution is statistically irrelevant once split by cell type — starting
 from a random feasible solution reaches essentially the same objective —
@@ -397,7 +431,7 @@ stochastic acceptance (making it greedy) does *not* worsen the objective on
 average, and is marginally better at M and L; the deterministic descent,
 restarts, and guided operators already reach the attractor without it.
 
-**Table 3.** Engine-component ablation (leave-one-out; degradation = relative
+**Table 4.** Engine-component ablation (leave-one-out; degradation = relative
 objective increase when the component is removed; two-sided Wilcoxon, all cells).
 
 | Component removed | n | Degradation (%) | p | Verdict |
@@ -417,15 +451,15 @@ objective.
 
 **Learned operator selection.** Finally we vary the selection policy itself,
 holding pool and components at *full*: uniform random, the base model's tabular
-Q-learning, and a transfer-trained deep Q-network (Table 4). No learned policy
+Q-learning, and a transfer-trained deep Q-network (Table 5). No learned policy
 beats uniform by a practically meaningful margin. Across budgets (mean gap to
 best-known) uniform runs 0.47 → 0.16%, tabular 0.56 → 0.09%, and DQN 0.56 →
 0.26% from 50 to 3,000 iterations: at 50 iterations uniform is *better* than
 tabular (+0.08%, p < 10⁻³), at 3,000 tabular edges uniform (+0.07%, p < 10⁻⁴),
 and the transfer DQN never wins at any budget and is significantly worse at
 1,000 and 3,000. All selection effects are ≤ 0.17 percentage points — below the
-guided-operator effect of Table 2 and an order of magnitude below the
-method-level differences of Table 1 — and their direction flips with budget.
+guided-operator effect of Table 3 and an order of magnitude below the
+method-level differences of Table 2 — and their direction flips with budget.
 
 Crucially, the same picture holds on the no-time-window cells alone, which are
 exactly the original problem of [5] with all trucks available at time zero: at
@@ -436,7 +470,7 @@ result is therefore not an artifact of the time-window extension; it already
 holds in the base setting where the original model introduces learned
 selection.
 
-**Table 4.** Selection-policy effects at 1,000 iterations (two-sided Wilcoxon;
+**Table 5.** Selection-policy effects at 1,000 iterations (two-sided Wilcoxon;
 positive mean = first method better).
 
 | Comparison | Mean diff (%) | p | Verdict |
