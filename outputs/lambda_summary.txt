@@ -1,0 +1,40 @@
+=== Scale-invariant makespan-tardiness trade-off (mean over all cells) ===
+  lambda   makespan_norm  tardiness_norm
+     0.0           0.126           0.988
+    0.25           0.291           0.246
+     0.5           0.304           0.180
+     1.0           0.410           0.138
+     2.0           0.492           0.085
+     4.0           0.612           0.040
+     8.0           0.735           0.037
+  (0 = best/min over the lambda grid per instance, 1 = worst/max)
+
+=== S: raw mean makespan / total tardiness by lambda ===
+  lambda      makespan     tardiness
+     0.0        2060.8        6464.1
+    0.25        2063.9        6325.1
+     0.5        2063.7        6318.0
+     1.0        2069.2        6304.3
+     2.0        2069.6        6304.9
+     4.0        2077.8        6297.6
+     8.0        2084.1        6296.6
+
+=== M: raw mean makespan / total tardiness by lambda ===
+  lambda      makespan     tardiness
+     0.0        4122.5       29782.2
+    0.25        4129.5       29398.2
+     0.5        4134.5       29380.4
+     1.0        4142.2       29346.0
+     2.0        4159.6       29324.7
+     4.0        4157.3       29312.2
+     8.0        4183.6       29307.2
+
+=== L: raw mean makespan / total tardiness by lambda ===
+  lambda      makespan     tardiness
+     0.0        6983.3       87215.5
+    0.25        6996.7       86449.9
+     0.5        6995.8       86392.5
+     1.0        7002.6       86373.6
+     2.0        7012.0       86323.6
+     4.0        7023.1       86306.5
+     8.0        7031.0       86311.9

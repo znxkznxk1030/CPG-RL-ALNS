@@ -206,8 +206,64 @@ def fig3():
         f.write(_svg(W, H, body))
 
 
+# ---- Figure 4: lambda sensitivity trade-off curve ---------------------------
+def fig4():
+    """Makespan-vs-tardiness trade-off as lambda varies (reads lambda_curve.json)."""
+    import json
+    src = os.path.join(os.path.dirname(__file__), "..", "outputs",
+                       "lambda_curve.json")
+    if not os.path.exists(src):
+        print("skip fig4: outputs/lambda_curve.json not found "
+              "(run experiments/lambda_summary.py first)")
+        return
+    curve = json.load(open(src))["curve"]
+    W, H = 560, 400
+    L, R, T, B = 70, 30, 40, 60
+    pw, ph = W - L - R, H - T - B
+
+    def X(v):  # makespan_norm 0..1
+        return L + v * pw
+
+    def Y(v):  # tardiness_norm 0..1
+        return T + (1 - v) * ph
+
+    body = ""
+    for g in [0.0, 0.25, 0.5, 0.75, 1.0]:
+        body += _line(L, Y(g), L + pw, Y(g), GRID, 1)
+        body += _txt(L - 10, Y(g) + 4, f"{g:.2f}", 11, "end", AXIS)
+        body += _line(X(g), T + ph, X(g), T + ph + 5, AXIS, 1)
+        body += _txt(X(g), T + ph + 20, f"{g:.2f}", 11, "middle", AXIS)
+    body += _line(L, T, L, T + ph, AXIS, 1.2)
+    body += _line(L, T + ph, L + pw, T + ph, AXIS, 1.2)
+    body += _txt(L + pw / 2, H - 10,
+                 "Makespan (normalised: 0 = min, 1 = max)", 13, "middle", INK)
+    body += _txt(18, T + ph / 2, "Total tardiness (normalised)", 13, "middle",
+                 INK, rot=-90)
+    pts = " ".join(f"{X(p['makespan_norm']):.1f},{Y(p['tardiness_norm']):.1f}"
+                   for p in curve)
+    body += (f'<polyline points="{pts}" fill="none" stroke="{C[0]}" '
+             f'stroke-width="2"/>\n')
+    for p in curve:
+        x, y = X(p["makespan_norm"]), Y(p["tardiness_norm"])
+        highlight = abs(p["lam"] - 1.0) < 1e-9
+        r = 5.5 if highlight else 3.8
+        col = C[1] if highlight else C[0]
+        body += f'<circle cx="{x:.1f}" cy="{y:.1f}" r="{r}" fill="{col}"/>\n'
+        lab = f"λ={p['lam']:g}"
+        body += _txt(x + 8, y - 7, lab, 10.5, "start",
+                     C[1] if highlight else "#333",
+                     weight="bold" if highlight else "normal")
+    body += _txt(L, T - 16, "Increasing λ trades makespan for tardiness; "
+                 "λ=1 keeps tardiness near-minimal at moderate makespan cost",
+                 11.5, "start", "#555", weight="bold")
+    with open(os.path.join(OUT, "fig4_lambda_tradeoff.svg"), "w") as f:
+        f.write(_svg(W, H, body))
+    print("wrote", os.path.join("paper/figures", "fig4_lambda_tradeoff.svg"))
+
+
 if __name__ == "__main__":
     fig1(); fig2(); fig3()
     for fn in ("fig1_selector_budget", "fig2_operator_pool",
                "fig3_component_ablation"):
         print("wrote", os.path.join("paper/figures", fn + ".svg"))
+    fig4()
