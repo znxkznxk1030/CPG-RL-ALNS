@@ -462,6 +462,36 @@ CP-SAT incumbent found after 240 s: the search reaches a near-optimal attractor
 regardless of which operator fires when, leaving no room for a selection policy
 to matter.
 
+### 6.3 Tardiness-weight sensitivity
+
+The objective (1) weights total tardiness by λ; our experiments fix λ = 1. To
+justify this modelling choice we trace the makespan–tardiness trade-off by
+sweeping λ ∈ {0, 0.25, 0.5, 1, 2, 4, 8} on the *tuning* pool (all six
+time-window cells, five instances × three replications, 1,000 iterations, seeds
+shared across λ so that only the objective weight differs). For each run we
+record the *physical* makespan and total tardiness of the returned schedule; to
+combine cells of very different magnitude we min–max normalize each metric
+across the λ grid per instance and average (Figure 4).
+
+![Tardiness-weight sensitivity: normalized makespan–tardiness trade-off as λ
+varies, averaged over all tuning time-window cells.](figures/fig4_lambda_tradeoff.svg)
+
+**Figure 4.** Tardiness-weight sensitivity. As λ grows the search trades a
+higher makespan for lower tardiness along a convex frontier (normalized
+makespan 0.13 → 0.74, normalized tardiness 0.99 → 0.04). Most of the achievable
+tardiness reduction is bought by the first increment away from λ = 0, after
+which returns diminish while the makespan penalty keeps rising.
+
+Two points support λ = 1. First, in absolute terms the conflict is mild: over
+the whole sweep mean makespan rises by only about 1% (e.g., S 2060.8 → 2084.1)
+while mean tardiness falls by 2–3% (e.g., L 87215 → 86306), so no reasonable λ
+is badly wrong. Second, λ = 1 already reaches near-minimal tardiness
+(normalized 0.14, versus 0.04 at the extreme λ = 8) at only a moderate makespan
+cost (normalized 0.41), and it is the natural interpretable choice — one unit of
+makespan time is traded against one unit of tardiness time. We therefore adopt
+λ = 1 throughout, and report this sweep as design justification rather than a
+tuned result (it uses the tuning pool only).
+
 ## 7. Discussion: when can adaptive components pay off?
 
 Our negative result is conditional, and the conditions are informative. The
