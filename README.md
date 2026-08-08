@@ -1,5 +1,11 @@
 # VAA-GILS for Compound-Truck Cross-Docking with Time Windows
 
+> **Note:** 구 저장소명은 `CPG-RL-ALNS`입니다. 연구 방향이 재정립되면서
+> 주 방법은 **VAA-GILS**(결정론적 병목 유도 반복 지역탐색)로 확정되었고,
+> 강화학습(RL) 요소는 성능 기여가 없는 것으로 확인되어 ablation/negative
+> finding으로만 다룹니다. 따라서 저장소명의 `RL-ALNS`는 현재 내용과 맞지
+> 않으며, 코드·문서 기준의 주 방법명은 VAA-GILS입니다.
+
 컴파운드 트럭과 부분 하역을 갖는 multi-door cross-docking truck scheduling
 문제를 다루는 연구 코드입니다. 기존 모델의 "모든 트럭이 시간 0에 도착"한다는
 가정과 순수 makespan 목적을 완화하고, 트럭별 도착 시각과 소프트 마감을 포함한
