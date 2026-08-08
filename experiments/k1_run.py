@@ -3,9 +3,11 @@
 Test-pool measurement. Methods and hyperparameters were frozen on the tuning
 pool; this is the first and only test-pool run for these methods.
 
-Grid: sizes S/M/L x uniform flow x TW in (none, medium, tight), 5 instances per
-cell. Stochastic methods get 5 replications; VAA and CP-SAT are deterministic.
-CP-SAT runs on all S instances (300s) and on 2 instances per M/L cell (600s).
+Grid: sizes S/M/L x uniform flow x TW in (none, medium, tight). The heuristic
+search batch uses 20 instances per cell (Phase D1); the budget and CP-SAT
+batches use 5. Stochastic methods get 5 replications; VAA and CP-SAT are
+deterministic. CP-SAT runs on all 5 S instances (300s) and on 2 instances per
+M/L cell (600s).
 
 Usage:
     python experiments/k1_run.py search   # fast batch (minutes)
@@ -29,6 +31,11 @@ OUTPUT = ROOT / "outputs" / "k1_results.jsonl"
 SIZES = ("S", "M", "L")
 TW_LEVELS = (None, "medium", "tight")
 INDICES = (0, 1, 2, 3, 4)
+# Phase D1: the heuristic search batch uses 20 instances per cell for statistical
+# power on the method comparisons of Table 2 (append-only runner reuses indices
+# 0-4 already on disk). The budget sweep and CP-SAT batches stay at 5 instances
+# (INDICES) to keep exact-solver time bounded.
+SEARCH_INDICES = tuple(range(20))
 REPS = (0, 1, 2, 3, 4)
 
 
@@ -36,7 +43,7 @@ def search_jobs() -> list[Job]:
     jobs: list[Job] = []
     for size in SIZES:
         for tw in TW_LEVELS:
-            for index in INDICES:
+            for index in SEARCH_INDICES:
                 common = dict(
                     pool="test",
                     size_class=size,
