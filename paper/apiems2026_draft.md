@@ -293,9 +293,13 @@ where H estimates the unconstrained makespan and (ρ, δ) = (0.25, 0.60) and
 **Protocol.** Seeds are split into disjoint train / tuning / test pools.
 All algorithm design and hyperparameters were frozen on the tuning pool; the
 DQN was trained on the train pool; every number below is the single test-pool
-run: 5 instances per cell × 5 replications (9 cells: 3 sizes × 3 window
-levels). CP-SAT runs once per instance with 8 threads: 300 s on S (all
-instances) and 600 s on M and L (2 instances per cell). λ = 1 on window cells.
+run. The main solution-quality comparison (Table 2 and its Wilcoxon tests) uses
+20 instances per cell × 5 replications (9 cells: 3 sizes × 3 window levels); the
+controlled ablations (Tables 3–5 and Figure 3) keep the original 5-instance
+design, since they are equal-budget, equal-structure decompositions rather than
+generalization claims. CP-SAT runs once per instance with 8 threads: 300 s on S
+(5 instances) and 600 s on M and L (2 instances per cell). λ = 1 on window
+cells.
 
 **Statistics.** Two-sided Wilcoxon signed-rank tests on paired runs (identical
 instance and replication seeds across methods).
@@ -314,60 +318,63 @@ knowledge, the best known. Accordingly, Table 2 reports the gap to the
 CP-SAT) as the primary quality measure, and the gap to the CP-SAT reference
 where one exists.
 
-**Table 2.** Test-pool results (5 instances × 5 reps per cell). Δbk = mean gap
-to the per-instance best-known solution. vs CP-SAT: S cells over all 5
-instances (S-none: proven optima); M-none over the 2 instances attempted.
+**Table 2.** Test-pool results. Mean obj ± std and Δbk are over 20 instances ×
+5 reps per cell (Phase D1); Δbk = mean gap to the per-instance best-known
+solution (over all methods and CP-SAT where available). vs CP-SAT is over the
+exact-referenced subset only (5 per S cell — S-none: proven optima; 2 for
+M-none) and is unchanged from the original exact runs.
 
 | Cell | Method | Mean obj ± std | Δbk (%) | vs CP-SAT (%) |
 |---|---|---|---:|---:|
-| S-none | VAA | 1443.3 ± 165.6 | 6.49 | +6.49 |
-| | Paper-SA-RL5 | 1375.9 ± 185.3 | 1.21 | +1.21 |
-| | GILS-uniform | 1362.5 ± 184.3 | 0.21 | +0.21 |
-| | GILS-tabular | 1364.1 ± 184.7 | 0.33 | +0.33 |
-| | GILS-DQN | 1370.0 ± 186.5 | 0.75 | +0.75 |
-| S-medium | VAA | 6426.2 ± 1869.2 | 3.33 | +3.33 |
-| | GILS-uniform | 6227.0 ± 1802.3 | 0.11 | +0.11 |
-| | GILS-tabular | 6229.5 ± 1798.2 | 0.18 | +0.18 |
-| | GILS-DQN | 6249.7 ± 1796.4 | 0.55 | +0.55 |
-| S-tight | VAA | 9278.4 ± 1189.2 | 2.17 | +2.17 |
-| | GILS-uniform | 9091.9 ± 1084.6 | 0.21 | +0.21 |
-| | GILS-tabular | 9088.9 ± 1086.6 | 0.17 | +0.17 |
-| | GILS-DQN | 9103.1 ± 1079.5 | 0.34 | +0.34 |
-| M-none | VAA | 2567.5 ± 354.4 | 3.97 | +4.80 |
-| | Paper-SA-RL5 | 2509.5 ± 344.4 | 1.64 | +0.99 |
-| | GILS-uniform | 2479.0 ± 340.0 | 0.40 | +0.13 |
-| | GILS-tabular | 2478.5 ± 340.7 | 0.38 | +0.11 |
-| | GILS-DQN | 2478.8 ± 339.5 | 0.40 | +0.19 |
-| M-medium | VAA | 21737.8 ± 3260.9 | 3.29 | — |
-| | GILS-uniform | 21153.7 ± 3296.8 | 0.43 | — |
-| | GILS-tabular | 21156.2 ± 3298.5 | 0.44 | — |
-| | GILS-DQN | 21182.4 ± 3301.2 | 0.56 | — |
-| M-tight | VAA | 26982.5 ± 3985.5 | 1.26 | — |
-| | GILS-uniform | 26701.6 ± 3952.3 | 0.21 | — |
-| | GILS-tabular | 26697.7 ± 3951.5 | 0.19 | — |
-| | GILS-DQN | 26721.0 ± 3956.5 | 0.28 | — |
-| L-none | VAA | 6050.8 ± 1701.2 | 1.67 | — |
-| | Paper-SA-RL5 | 6046.3 ± 1705.0 | 1.57 | — |
-| | GILS-uniform | 5972.2 ± 1687.8 | 0.28 | — |
-| | GILS-tabular | 5967.8 ± 1682.6 | 0.22 | — |
-| | GILS-DQN | 5968.6 ± 1681.0 | 0.24 | — |
-| L-medium | VAA | 54288.8 ± 19106.9 | 0.88 | — |
-| | GILS-uniform | 53955.7 ± 19029.2 | 0.19 | — |
-| | GILS-tabular | 53935.2 ± 19034.1 | 0.14 | — |
-| | GILS-DQN | 53962.1 ± 19028.8 | 0.20 | — |
-| L-tight | VAA | 124638.8 ± 34762.6 | 0.59 | — |
-| | GILS-uniform | 123961.1 ± 34581.4 | 0.05 | — |
-| | GILS-tabular | 123949.1 ± 34589.2 | 0.04 | — |
-| | GILS-DQN | 123963.1 ± 34580.9 | 0.06 | — |
+| S-none | VAA | 1497.5 ± 400.3 | 6.60 | +6.49 |
+| | Paper-SA-RL5 | 1423.3 ± 383.6 | 1.03 | +1.21 |
+| | GILS-uniform | 1411.8 ± 382.7 | 0.16 | +0.21 |
+| | GILS-tabular | 1412.9 ± 381.3 | 0.28 | +0.33 |
+| | GILS-DQN | 1416.1 ± 382.4 | 0.51 | +0.75 |
+| S-medium | VAA | 5447.5 ± 1468.9 | 3.89 | +3.33 |
+| | GILS-uniform | 5255.7 ± 1413.3 | 0.08 | +0.11 |
+| | GILS-tabular | 5259.1 ± 1412.3 | 0.15 | +0.18 |
+| | GILS-DQN | 5270.8 ± 1415.3 | 0.38 | +0.55 |
+| S-tight | VAA | 9276.8 ± 2387.6 | 2.90 | +2.17 |
+| | GILS-uniform | 9010.8 ± 2206.1 | 0.09 | +0.21 |
+| | GILS-tabular | 9011.9 ± 2206.7 | 0.11 | +0.17 |
+| | GILS-DQN | 9022.0 ± 2205.3 | 0.23 | +0.34 |
+| M-none | VAA | 3030.9 ± 903.6 | 3.73 | +4.80 |
+| | Paper-SA-RL5 | 2976.4 ± 864.4 | 1.86 | +0.99 |
+| | GILS-uniform | 2928.9 ± 842.6 | 0.29 | +0.13 |
+| | GILS-tabular | 2932.1 ± 846.3 | 0.37 | +0.11 |
+| | GILS-DQN | 2932.5 ± 845.5 | 0.40 | +0.19 |
+| M-medium | VAA | 23025.5 ± 4075.4 | 2.56 | — |
+| | GILS-uniform | 22526.4 ± 3960.5 | 0.29 | — |
+| | GILS-tabular | 22515.5 ± 3964.0 | 0.24 | — |
+| | GILS-DQN | 22540.3 ± 3956.4 | 0.36 | — |
+| M-tight | VAA | 38903.7 ± 11283.5 | 1.25 | — |
+| | GILS-uniform | 38528.0 ± 11078.0 | 0.19 | — |
+| | GILS-tabular | 38512.1 ± 11059.5 | 0.16 | — |
+| | GILS-DQN | 38543.6 ± 11077.6 | 0.24 | — |
+| L-none | VAA | 5492.3 ± 1482.2 | 2.21 | — |
+| | Paper-SA-RL5 | 5479.7 ± 1449.5 | 1.97 | — |
+| | GILS-uniform | 5388.4 ± 1427.3 | 0.27 | — |
+| | GILS-tabular | 5385.5 ± 1424.6 | 0.22 | — |
+| | GILS-DQN | 5386.1 ± 1425.2 | 0.23 | — |
+| L-medium | VAA | 55611.1 ± 18087.3 | 1.52 | — |
+| | GILS-uniform | 54846.4 ± 17523.5 | 0.10 | — |
+| | GILS-tabular | 54833.4 ± 17526.8 | 0.07 | — |
+| | GILS-DQN | 54848.8 ± 17522.9 | 0.11 | — |
+| L-tight | VAA | 119671.9 ± 32475.3 | 0.77 | — |
+| | GILS-uniform | 118901.4 ± 31781.1 | 0.08 | — |
+| | GILS-tabular | 118865.6 ± 31788.4 | 0.05 | — |
+| | GILS-DQN | 118888.8 ± 31789.1 | 0.07 | — |
 
-Three observations. (i) On every cell with an exact reference, GILS matches
-it: within 0.21–0.75% of the five proven optima on S-none, within 0.11–0.55%
-of the 300 s CP-SAT incumbents on S-medium and S-tight, and within 0.11–0.19%
-of the 600 s incumbents on M-none — where the best GILS runs in fact improve
-on the CP-SAT incumbent (Δbk < vs CP-SAT). (ii) The ordering
+Three observations. (i) On every cell with an exact reference, GILS matches it
+(vs CP-SAT column, on the exact-referenced instances): within 0.21–0.75% of the
+five proven optima on S-none, within 0.11–0.55% of the 300 s CP-SAT incumbents
+on S-medium and S-tight, and within 0.11–0.19% of the 600 s incumbents on
+M-none, which the best GILS runs match or beat. (ii) The ordering
 GILS < Paper-SA-RL5 < VAA holds in every cell where the baseline is defined;
-Wilcoxon tests confirm GILS-tabular beats VAA (+2.39% mean, n = 45, p < 10⁻⁴)
-and Paper-SA-RL5 (+1.16%, n = 75 pairs, p < 10⁻⁴). (iii) Our combinatorial
+over the 20-instance test set, Wilcoxon tests confirm GILS-tabular beats VAA
+(+2.64% mean, n = 180, p < 10⁻⁴) and Paper-SA-RL5 (+1.33%, n = 297 pairs,
+p < 10⁻⁴). (iii) Our combinatorial
 lower bounds are informative on no-window cells but loose elsewhere: the gap
 of the *best-known solution itself* to the bound is 0.0% on S-none (optimality
 proven), 18.5–51.5% on the other S cells, 33–34% on M-none and L-none, and
